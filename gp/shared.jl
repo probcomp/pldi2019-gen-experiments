@@ -14,7 +14,7 @@ import Random
 #########################
 
 function get_airline_dataset()
-    df = CSV.read("airline.csv")
+    df = CSV.read("resources/airline.csv")
     xs = df[1]
     ys = df[2]
     xs .-= minimum(xs) # set x minimum to 0.

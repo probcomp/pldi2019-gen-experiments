@@ -137,7 +137,7 @@ function experiment()
         gca()[:set_xlim]((0, 1.5))
         gca()[:set_ylim]((-3, 3))
     end
-    savefig("lightweight.png")
+    savefig("resources/lightweight.png")
 end
 
 experiment()
