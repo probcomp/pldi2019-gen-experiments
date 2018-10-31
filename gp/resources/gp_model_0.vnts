@@ -3,16 +3,16 @@
 assume get_tree_root = () -> {1};
 
 assume get_base_kernel_index ~ mem((node_index) ~> {
-    uniform_discrete(0,5) #structure:node_index
+    uniform_discrete(1,5) #structure:node_index
 });
 
 
 assume choose_primitive =  mem((node_index) ~> {
   rolled_dice = get_base_kernel_index(node_index);
   cond(
-    (rolled_dice == 0)(
-      ["WN", get_hyper_prior(pair("WN", node_index))
-    ]),
+    // (rolled_dice == 0)(
+    //   ["WN", get_hyper_prior(pair("WN", node_index))
+    // ]),
     (rolled_dice == 1)(
       ["C", get_hyper_prior(pair("C", node_index))
     ]),
@@ -51,7 +51,8 @@ assume generate_random_covariance_ast = mem((node_index) ~> {
 
 assume generate_random_ast = mem((node_index) ~> {
     cov = generate_random_covariance_ast(node_index);
-    ["+", cov, ["WN", 0.01]]
+    noise = gamma(1,1) + 0.01;
+    ["+", cov, ["WN", noise]]
 });
 
 
