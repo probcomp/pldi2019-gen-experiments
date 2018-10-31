@@ -1,0 +1,71 @@
+// Basic synthesis model for Gaussian Process covariacne kernels.
+
+assume get_tree_root = () -> {1};
+
+assume get_base_kernel_index ~ mem((node_index) ~> {
+    uniform_discrete(0,5) #structure:node_index
+});
+
+
+assume choose_primitive =  mem((node_index) ~> {
+  rolled_dice = get_base_kernel_index(node_index);
+  cond(
+    (rolled_dice == 0)(
+      ["WN", get_hyper_prior(pair("WN", node_index))
+    ]),
+    (rolled_dice == 1)(
+      ["C", get_hyper_prior(pair("C", node_index))
+    ]),
+    (rolled_dice == 2)(
+      ["LIN", get_hyper_prior(pair("LIN", node_index))
+    ]),
+    (rolled_dice == 3)(
+      ["SE", 0.01 + get_hyper_prior(pair("SE", node_index))
+    ]),
+    (rolled_dice == 4)(
+      ["PER",
+        0.01 + get_hyper_prior(pair("PER_l", node_index)),
+        0.01 + get_hyper_prior(pair("PER_t", node_index))
+    ]),
+    True("Error!"))
+});
+
+assume choose_operator = mem((node_index) ~> {
+    operator_symbol ~ categorical(
+        // simplex(0.35, 0.35, 0.30),
+        simplex(.45, .45, .10),
+        ["+", "*", "CP"]
+    ) #structure:pair("operator", node_index);
+    if (operator_symbol == "CP") {
+        [
+            operator_symbol,
+            get_hyper_prior(pair("CP", node_index)),
+            0.1
+        ]
+    } else {
+        operator_symbol
+    }
+});
+
+assume generate_random_covariance_ast = mem((node_index) ~> {
+    if (flip(0.3) #structure:pair("branch", node_index)) {
+        operator ~ choose_operator(node_index);
+        [
+            operator,
+            generate_random_covariance_ast(2 * node_index),
+            generate_random_covariance_ast((2 * node_index + 1))
+        ]
+    } else {
+        choose_primitive(node_index)
+    }
+});
+
+assume generate_random_ast = mem((node_index) ~> {
+    cov = generate_random_covariance_ast(node_index);
+    ["+", cov, ["WN", 0.01]]
+});
+
+
+assume ast ~ generate_random_ast(get_tree_root()) #gp;
+assume venturescript_source = compile_ast_to_venturescript(ast);
+assume gp = eval_expr(venturescript_source);
