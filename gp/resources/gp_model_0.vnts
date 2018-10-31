@@ -31,20 +31,9 @@ assume choose_primitive =  mem((node_index) ~> {
 });
 
 assume choose_operator = mem((node_index) ~> {
-    operator_symbol ~ categorical(
-        // simplex(0.35, 0.35, 0.30),
-        simplex(.45, .45, .10),
-        ["+", "*", "CP"]
-    ) #structure:pair("operator", node_index);
-    if (operator_symbol == "CP") {
-        [
-            operator_symbol,
-            get_hyper_prior(pair("CP", node_index)),
-            0.1
-        ]
-    } else {
-        operator_symbol
-    }
+    operator_symbol ~ categorical(simplex(.5, .5), ["+", "*"])
+        #structure:pair("operator", node_index);
+    operator_symbol
 });
 
 assume generate_random_covariance_ast = mem((node_index) ~> {
