@@ -115,23 +115,19 @@ def _partition_dataset(dataset, mode, num_test, seed):
 
 def run_gp_model_hyperpriors(ripl, xs, ys):
     """Execute program setting data-dependent hyperpriors."""
-    x_min = np.min(xs)
     x_max = np.max(xs)
     y_max = np.max(ys)
     ripl.execute_program('''
-    assume x_min = %1.10f;   // minimum of observed input
     assume x_max = %1.10f;   // maximum of observed input
     assume y_max = %1.10f;   // maximum of observed output
     assume get_hyper_prior ~ mem((node_index) -> {
         if (node_index[0] == "WN" or node_index[0] == "C") {
-            // Sample hyper-priors ranging over the y axis.
-            uniform_continuous(x_min, y_max) #hypers:node_index
+            uniform_continuous(0, y_max) #hypers:node_index
         } else {
-            // Sample hyper-priors ranging over the x axis.
             uniform_continuous(0, x_max) #hypers:node_index
         }
     });
-    ''' % (x_min, x_max, y_max))
+    ''' % (x_max, y_max))
     return ripl
 
 def run_gp_model_synthesizer(ripl):
