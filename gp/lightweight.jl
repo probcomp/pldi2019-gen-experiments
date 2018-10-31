@@ -59,7 +59,7 @@ end
     # compute covariance matrix
     cov_matrix = compute_cov_matrix_vectorized(covariance_fn, noise, xs)
 
-    # sample from multivariate normal   
+    # sample from multivariate normal
     @addr(mvnormal(zeros(n), cov_matrix), :ys)
 
     return covariance_fn
@@ -102,7 +102,7 @@ function inference(xs::Vector{Float64}, ys::Vector{Float64}, num_iters::Int)
         # do MH move on the top-level white noise
         trace = mh(model, noise_proposal, (), trace)
     end
-    
+
     noise = get_assignment(trace)[:noise]
     return (covariance_fn, noise)
 end

@@ -112,7 +112,7 @@ end
 
     # don't provide any information about the change in return value
     @diff @retdiff(CovFnAndMatrixDiff())
-    
+
     # to be passed to the parent aggregation kernel application
     w = CovFnAndMatrix(node, cov_matrix)
 
@@ -141,20 +141,20 @@ const covariance_prior = Tree(
     n = length(xs)
     cov_matrix = cov_fn_and_matrix.cov_matrix + Matrix(noise * LinearAlgebra.I, n, n)
 
-    # sample from multivariate normal   
+    # sample from multivariate normal
     @addr(mvnormal(zeros(n), cov_matrix), :ys)
 
     return cov_fn_and_matrix.node
 end
 
 @gen function subtree_proposal_recursive(cur::Int)
-    
+
     # base address for production kernel application 'cur'
     prod_addr = (cur, Val(:production))
 
     # base address for aggregation kernel application 'cur'
     agg_addr = (cur, Val(:aggregation))
-    
+
     # sample node type
     node_type = @addr(categorical(node_dist), (cur, Val(:production)) => :type)
 
@@ -228,7 +228,7 @@ function inference(xs::Vector{Float64}, ys::Vector{Float64}, num_iters::Int)
 
         # do MH move on the subtree
         trace = mh(model, subtree_proposal, (root,), trace, correction)
-        
+
         # do MH move on the top-level white noise
         trace = mh(model, noise_proposal, (), trace)
     end
