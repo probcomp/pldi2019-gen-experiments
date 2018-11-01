@@ -203,6 +203,8 @@ def infer_and_predict(ripl, idx, iters, xs_test, ys_test, xs_probe,
     start = time.time()
     ripl = run_mh_inference(ripl, iters)
     runtime = time.time() - start
+    print 'Finished epoch in seconds: %1.2f' % (runtime,)
+    # Collect statistics.
     log_weight = get_particle_log_weight(ripl)
     log_joint = get_particle_log_joint(ripl)
     log_likelihood = get_particle_log_likelihood(ripl)
@@ -211,12 +213,10 @@ def infer_and_predict(ripl, idx, iters, xs_test, ys_test, xs_probe,
     predictions_held_in = get_particle_predictions(ripl, xs_probe, npred_in)
     predictions_held_out = get_particle_predictions(ripl, xs_test, npred_out)
     asts = get_synthesized_asts(ripl)
-    programs = get_synthesized_programs(ripl)
     # Derived statistics.
     predictions_held_in_mean = np.mean(predictions_held_in, axis=0).tolist()
     predictions_held_out_mean = np.mean(predictions_held_out, axis=0).tolist()
     rmse_values = compute_predictions_rmse(ys_test, predictions_held_out_mean)
-    print 'Finished epoch in seconds: %1.2f' % (runtime,)
     return {
         'iters'                    : iters,
         'log_weight'               : log_weight,
@@ -227,14 +227,12 @@ def infer_and_predict(ripl, idx, iters, xs_test, ys_test, xs_probe,
         'predictions_held_in'      : predictions_held_in,
         'predictions_held_out'     : predictions_held_out,
         'asts'                     : asts,
-        'programs'                 : programs,
         # Derived statistics.
         'predictions_heldin_mean'  : predictions_held_in_mean,
         'predictions_heldout_mean' : predictions_held_out_mean,
         'rmse_values'              : rmse_values,
         'runtime'                  : runtime,
     }
-
 
 # Command line interface.
 
@@ -352,8 +350,8 @@ def run_pipeline(
             'xs_test'               : xs_test.tolist(),
             'ys_test'               : ys_test.tolist(),
             'xs_probe'              : xs_probe.tolist(),
-            'num_iters'             : iters,
-            'num_epochs'            : epochs,
+            'n_iters'               : iters,
+            'n_epochs'              : epochs,
             'nprobe_held_in'        : nprobe_held_in,
             'npred_held_in'         : npred_held_in,
             'npred_held_out'        : npred_held_out,
