@@ -169,7 +169,7 @@ def compute_predictions_rmse(values, predictions):
     sq_err = (predictions - values)**2
     rmse = np.sqrt(np.mean(sq_err))
     print 'Computed RMSE: ', rmse
-    return rmse.tolist()
+    return rmse
 
 def observe_training_set(ripl, xs, ys):
     """Incorporate training set into the GP."""
@@ -205,18 +205,18 @@ def infer_and_predict(ripl, idx, iters, xs_test, ys_test, xs_probe,
     runtime = time.time() - start
     print 'Finished epoch in seconds: %1.2f' % (runtime,)
     # Collect statistics.
-    log_weight = get_particle_log_weight(ripl)
-    log_joint = get_particle_log_joint(ripl)
-    log_likelihood = get_particle_log_likelihood(ripl)
-    log_prior = compute_particle_log_prior(log_joint, log_likelihood)
-    log_predictive = get_particle_log_predictive(ripl, xs_test, ys_test)
+    log_weight = get_particle_log_weight(ripl)[0]
+    log_joint = get_particle_log_joint(ripl)[0]
+    log_likelihood = get_particle_log_likelihood(ripl)[0]
+    log_prior = log_joint - log_likelihood
+    log_predictive = get_particle_log_predictive(ripl, xs_test, ys_test)[0]
     predictions_held_in = get_particle_predictions(ripl, xs_probe, npred_in)
     predictions_held_out = get_particle_predictions(ripl, xs_test, npred_out)
     asts = get_synthesized_asts(ripl)
     # Derived statistics.
     predictions_held_in_mean = np.mean(predictions_held_in, axis=0).tolist()
     predictions_held_out_mean = np.mean(predictions_held_out, axis=0).tolist()
-    rmse_values = compute_predictions_rmse(ys_test, predictions_held_out_mean)
+    rmse = compute_predictions_rmse(ys_test, predictions_held_out_mean)
     return {
         'iters'                    : iters,
         'log_weight'               : log_weight,
@@ -230,7 +230,7 @@ def infer_and_predict(ripl, idx, iters, xs_test, ys_test, xs_probe,
         # Derived statistics.
         'predictions_heldin_mean'  : predictions_held_in_mean,
         'predictions_heldout_mean' : predictions_held_out_mean,
-        'rmse_values'              : rmse_values,
+        'rmse'                     : rmse,
         'runtime'                  : runtime,
     }
 
