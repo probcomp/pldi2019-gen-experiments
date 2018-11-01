@@ -218,6 +218,7 @@ def infer_and_predict(ripl, idx, iters, xs_test, ys_test, xs_probe,
     rmse_values = compute_predictions_rmse(ys_test, predictions_held_out_mean)
     print 'Finished epoch in seconds: %1.2f' % (runtime,)
     return {
+        'iters'                    : iters,
         'log_weight'               : log_weight,
         'log_joint'                : log_joint,
         'log_likelihood'           : log_likelihood,
