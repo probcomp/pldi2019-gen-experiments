@@ -137,7 +137,10 @@ function experiment()
 
         ax[:set_xlim]((0, 1.5))
         ax[:set_ylim]((-1, 1))
+        ax[:grid](true)
     end
+    fig[:set_tight_layout](true)
+    fig[:set_size_inches](20, 14)
     fig[:savefig]("resources/lightweight.png")
 end
 
