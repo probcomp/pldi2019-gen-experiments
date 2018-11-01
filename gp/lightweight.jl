@@ -118,9 +118,9 @@ function experiment()
     # set seed
     Random.seed!(0)
 
-    figure(figsize=(32,32))
-    for i=1:16
-        subplot(4, 4, i)
+    fig, axess = PyPlot.subplots(4,4)
+    for (i, ax) in zip(1:16, axess)
+        # subplot(4, 4, i)
 
         # do inference, time it
         @time (covariance_fn, noise) = inference(xs, ys, 1000)
@@ -129,15 +129,15 @@ function experiment()
         new_ys = predict_ys(covariance_fn, noise, xs, ys, new_xs)
 
         # plot observed data
-        plot(xs, ys, color="black")
+        ax[:plot](xs, ys, color="black")
 
         # plot predictions
-        plot(new_xs, new_ys, color="red")
+        ax[:plot](new_xs, new_ys, color="red")
 
-        gca()[:set_xlim]((0, 1.5))
-        gca()[:set_ylim]((-3, 3))
+        ax[:set_xlim]((0, 1.5))
+        ax[:set_ylim]((-1, 1))
     end
-    savefig("resources/lightweight.png")
+    fig[:savefig]("resources/lightweight.png")
 end
 
 experiment()

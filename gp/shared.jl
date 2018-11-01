@@ -3,7 +3,7 @@ using Gen: get_child
 import Statistics
 import LinearAlgebra
 import CSV
-using PyPlot: figure, subplot, plot, scatter, gca, savefig
+import PyPlot
 import Random
 
 # TODO: figure out the correction for the probablity of picking the given node
@@ -13,14 +13,18 @@ import Random
 # load airline data set #
 #########################
 
+function rescale_linear(xs::Vector{Float64}, yl::Float64, yh::Float64)
+    xl = minimum(xs)
+    xh = maximum(xs)
+    slope = (yh - yl) / (xh - xl)
+    intercept = yh - xh * slope
+    return slope .* xs .+ intercept
+end
+
 function get_airline_dataset()
-    df = CSV.read("resources/airline.csv")
-    xs = df[1]
-    ys = df[2]
-    xs .-= minimum(xs) # set x minimum to 0.
-    xs /= maximum(xs) # scale x so that maximum is at 1.
-    ys .-= Statistics.mean(ys) # set y mean to 0.
-    ys *= 4 / (maximum(ys) - minimum(ys)) # make it fit in the window [-2, 2]
+    df = CSV.read("resources/airline.csv", header=0)
+    xs = rescale_linear(Vector{Float64}(df[1]), 0., 1.)
+    ys = rescale_linear(Vector{Float64}(df[2]), -1., 1.)
     return (xs, ys)
 end
 
