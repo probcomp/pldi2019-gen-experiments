@@ -103,8 +103,7 @@ function inference(xs::Vector{Float64}, ys::Vector{Float64}, num_iters::Int)
         trace = mh(model, noise_proposal, (), trace)
     end
 
-    noise = get_assignment(trace)[:noise]
-    return (covariance_fn, noise)
+    return trace
 end
 
 function experiment()
@@ -123,7 +122,9 @@ function experiment()
         # subplot(4, 4, i)
 
         # do inference, time it
-        @time (covariance_fn, noise) = inference(xs, ys, 1000)
+        @time trace = inference(xs, ys, 1000)
+        covariance_fn = get_call_record(trace).retval
+        noise = get_assignment(trace)[:noise]
 
         # sample predictions
         new_ys = predict_ys(covariance_fn, noise, xs, ys, new_xs)
