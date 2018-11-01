@@ -36,6 +36,9 @@ end
 Node in a tree representing a covariance function
 """
 abstract type Node end
+abstract type LeafNode <: Node end
+abstract type BinaryOpNode <: Node end
+
 
 """
     size(::Node)
@@ -43,6 +46,9 @@ abstract type Node end
 Number of nodes in the subtree rooted at this node.
 """
 function size end
+size(::LeafNode) = 1
+size(node::BinaryOpNode) = node.size
+
 
 """
     pick_random_node(::Node, cur::Int, max_branch::Int)
@@ -51,14 +57,6 @@ Return a random node in the subtree rooted at the given node, whose integer
 index is given.
 """
 function pick_random_node end
-
-abstract type LeafNode <: Node end
-
-size(::LeafNode) = 1
-
-abstract type BinaryOpNode <: Node end
-
-size(node::BinaryOpNode) = node.size
 
 pick_random_node(node::LeafNode, cur::Int, max_branch::Int) = cur
 
