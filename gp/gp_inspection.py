@@ -61,7 +61,7 @@ def tabulate_experiment_statistics(path, particle=0):
 
 @parsable
 def tabulate_experiments_statistics(*paths):
-    """Product a CSV containing aggregate statistics from experiments."""
+    """Produce a CSV containing aggregate statistics from experiments."""
     frames = [tabulate_experiment_statistics(p, i) for i, p in enumerate(paths)]
     frame = pd.concat(frames)
     fname = paths[0].split(os.sep)[-1]
