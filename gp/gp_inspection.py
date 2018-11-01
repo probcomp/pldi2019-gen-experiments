@@ -9,6 +9,10 @@ import os
 
 from collections import OrderedDict
 
+import matplotlib
+matplotlib.use('Agg')
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
@@ -63,6 +67,40 @@ def tabulate_experiments_statistics(*paths):
     fname = paths[0].split(os.sep)[-1]
     fname = os.path.join(DIR_REPORTS, fname.replace('.json', '.merged.report.csv'))
     frame.to_csv(fname, index=False)
+    print fname
+
+@parsable
+def plot_predictions(path, epoch=None):
+    """Plot the observed data and predictions from a single run."""
+    with open(path, 'r') as f:
+        results = json.load(f)
+    epochs = range(results['n_epochs'])
+    epoch = epochs[-1] if epoch is None else epoch
+    # Extract the dataset.
+    xs_probe = results['xs_probe']
+    xs_train = results['xs_train']
+    ys_train = results['ys_train']
+    xs_test = results['xs_test']
+    ys_test = results['ys_test']
+    # Extract the predictions.
+    statistics = results['statistics']
+    predictions_held_in = statistics[epoch]['predictions_held_in']
+    predictions_held_out = statistics[epoch]['predictions_held_out']
+    # Plot.
+    fig, ax = plt.subplots()
+    ax.scatter(xs_train, ys_train, marker='x', color='k', label='Observed Data')
+    ax.scatter(xs_test, ys_test, marker='x', color='r', label='Test Data')
+    # for ys in predictions_held_in:
+    #     ax.plot(xs_probe, ys, color='g', alpha=0.2)
+    # ax.plot(xs_probe, np.mean(ys, axis=0), color='g')
+    # for ys in predictions_held_out:
+    #     ax.plot(xs_test, ys, color='g', alpha=0.2)
+    ax.plot(xs_probe, np.mean(predictions_held_in, axis=0), color='g')
+    ax.plot(xs_test, np.mean(predictions_held_out, axis=0), color='g')
+    fig.set_tight_layout(True)
+    fname = path.split(os.sep)[-1]
+    fname = os.path.join(DIR_PLOTS, fname.replace('.json', '.predictions.png'))
+    fig.savefig(fname)
     print fname
 
 if __name__ == '__main__':
