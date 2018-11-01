@@ -55,7 +55,6 @@ assume generate_random_ast = mem((node_index) ~> {
     ["+", cov, ["WN", noise]]
 });
 
-
 assume ast ~ generate_random_ast(get_tree_root()) #gp;
 assume venturescript_source = compile_ast_to_venturescript(ast);
 assume gp = eval_expr(venturescript_source);

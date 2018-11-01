@@ -35,16 +35,23 @@ def float_list_to_str(items):
     items_str = ', '.join('%1.5f' % (i,) for i in items)
     return '[%s]' % (items_str)
 
-def get_results_filename(shortname, num_particles, num_iters, num_epochs,
-        num_pred, seed):
+def rescale_linear(xs, yl, yh):
+    """Rescale values linearly between [yl, yh]."""
+    xl = min(xs)
+    xh = max(xs)
+    slope = float(yh - yl) / (xh - xl)
+    intercept = yh - xh * slope
+    return slope* xs + intercept
+
+def get_results_filename(shortname, n_test, n_iters, n_epochs, schedule, seed):
     """Return filename to store results of given pipeline invocation."""
     parts = [
         ['stamp',       '%s' % (timestamp(),)],
         ['shortname',   '%s' % (shortname,)],
-        ['particles',   '%d' % (num_particles,)],
-        ['iters',       '%d' % (num_iters,)],
-        ['epochs',      '%d' % (num_epochs,)],
-        ['pred',        '%d' % (num_pred,)],
+        ['ntest',       '%d' % (n_test,)],
+        ['iters',       '%d' % (n_iters,)],
+        ['epochs',      '%d' % (n_epochs,)],
+        ['schedule',    '%s' % (schedule,)],
         ['seed',        '%d' % (seed,)],
     ]
     return '_'.join('@'.join(part) for part in parts)
@@ -121,11 +128,12 @@ def run_gp_model_hyperpriors(ripl, xs, ys):
     assume x_max = %1.10f;   // maximum of observed input
     assume y_max = %1.10f;   // maximum of observed output
     assume get_hyper_prior ~ mem((node_index) -> {
-        if (node_index[0] == "WN" or node_index[0] == "C") {
-            uniform_continuous(0, y_max) #hypers:node_index
-        } else {
-            uniform_continuous(0, x_max) #hypers:node_index
-        }
+        uniform_continuous(0, 1) #hypers:node_index
+        // if (node_index[0] == "WN" or node_index[0] == "C") {
+        //     uniform_continuous(0, y_max) #hypers:node_index
+        // } else {
+        //     uniform_continuous(0, x_max) #hypers:node_index
+        // }
     });
     ''' % (x_max, y_max))
     return ripl
@@ -158,32 +166,22 @@ def get_particle_log_predictive(ripl, xs, ys):
     xs_str = float_list_to_str(xs)
     ys_str = float_list_to_str(ys)
     print 'Computing log predictive on inputs with outputs:', xs_str, ys_str
-    logps = ripl.evaluate(
-        '_tmp: observe gp(%s) = %s' % (xs_str, ys_str))
+    logps = ripl.evaluate('_tmp: observe gp(%s) = %s' % (xs_str, ys_str))
     ripl.forget('_tmp')
-    return np.transpose(logps).tolist()
+    return list(logps)
 
 def get_particle_predictions(ripl, xs, num_replicates):
-    # Format of array is: predictions_raw[replicate][particle][xp]
+    # Format of array is: predictions_raw[replicate][xp]
     xs_str = float_list_to_str(xs)
     print 'Sampling predictions on input:', xs
-    predictions_raw = [
-        ripl.sample_all('gp(%s)' % (xs_str))
-        for _i in xrange(num_replicates)
-    ]
-    # Format of array is: predictions[particle][replicate][grid]
-    predictions = np.swapaxes(predictions_raw, 0, 1)
-    return predictions.tolist()
+    pred = [ripl.sample('gp(%s)' % (xs_str)) for _i in xrange(num_replicates)]
+    return np.asarray(pred).tolist()
 
 def compute_predictions_rmse(values, predictions):
-    assert np.ndim(predictions) == 2
-    num_particles, num_probes = np.shape(predictions)
+    assert len(predictions) == len(values)
     predictions = np.asarray(predictions)
-    assert num_probes == len(values)
     sq_err = (predictions - values)**2
-    mean_sq_err = np.mean(sq_err, axis=1)
-    rmse = np.sqrt(mean_sq_err)
-    assert np.shape(rmse) == (num_particles,)
+    rmse = np.sqrt(np.mean(sq_err))
     print 'Computed RMSE: ', rmse
     return rmse.tolist()
 
@@ -200,20 +198,10 @@ def observe_training_set(ripl, xs, ys):
     return ripl
 
 def get_synthesized_asts(ripl):
-    return ripl.sample_all('ast')
+    return ripl.sample('ast')
 
 def get_synthesized_programs(ripl):
-    return ripl.sample_all('compile_ast_to_venturescript(ast)')
-
-def resample_particles(ripl, count, multiprocess):
-    """Create a stochastic ensemble of particles."""
-    print 'Resampling particles: %d' % (count,)
-    if multiprocess:
-        ripl.evaluate('resample_multiprocess(%d)' % (count,))
-    else:
-        ripl.evaluate('resample(%d)' % (count,))
-    ripl.evaluate('reset_to_prior')
-    return ripl
+    return ripl.sample('compile_ast_to_venturescript(ast)')
 
 def run_mh_inference(ripl, steps):
     print 'Running MH for iterations: %d' % (steps,)
@@ -228,20 +216,20 @@ def infer_and_predict(ripl, idx, iters, xs_test, ys_test, xs_probe,
     print 'Starting epoch: %d' % (idx,)
     start = time.time()
     ripl = run_mh_inference(ripl, iters)
+    runtime = time.time() - start
     log_weight = get_particle_log_weight(ripl)
     log_joint = get_particle_log_joint(ripl)
     log_likelihood = get_particle_log_likelihood(ripl)
     log_prior = compute_particle_log_prior(log_joint, log_likelihood)
     log_predictive = get_particle_log_predictive(ripl, xs_test, ys_test)
-    predictions_heldin = get_particle_predictions(ripl, xs_probe, npred_in)
-    predictions_heldout = get_particle_predictions(ripl, xs_test, npred_out)
+    predictions_held_in = get_particle_predictions(ripl, xs_probe, npred_in)
+    predictions_held_out = get_particle_predictions(ripl, xs_test, npred_out)
     asts = get_synthesized_asts(ripl)
     programs = get_synthesized_programs(ripl)
     # Derived statistics.
-    predictions_heldin_mean = np.mean(predictions_heldin, axis=1).tolist()
-    predictions_heldout_mean = np.mean(predictions_heldout, axis=1).tolist()
-    rmse_values = compute_predictions_rmse(ys_test, predictions_heldout_mean)
-    runtime = time.time() - start
+    predictions_held_in_mean = np.mean(predictions_held_in, axis=0).tolist()
+    predictions_held_out_mean = np.mean(predictions_held_out, axis=0).tolist()
+    rmse_values = compute_predictions_rmse(ys_test, predictions_held_out_mean)
     print 'Finished epoch in seconds: %1.2f' % (runtime,)
     return {
         'log_weight'               : log_weight,
@@ -249,13 +237,13 @@ def infer_and_predict(ripl, idx, iters, xs_test, ys_test, xs_probe,
         'log_likelihood'           : log_likelihood,
         'log_prior'                : log_prior,
         'log_predictive'           : log_predictive,
-        'predictions_heldin'       : predictions_heldin,
-        'predictions_heldout'      : predictions_heldout,
+        'predictions_held_in'      : predictions_held_in,
+        'predictions_held_out'     : predictions_held_out,
         'asts'                     : asts,
         'programs'                 : programs,
         # Derived statistics.
-        'predictions_heldin_mean'  : predictions_heldin_mean,
-        'predictions_heldout_mean' : predictions_heldout_mean,
+        'predictions_heldin_mean'  : predictions_held_in_mean,
+        'predictions_heldout_mean' : predictions_held_out_mean,
         'rmse_values'              : rmse_values,
         'runtime'                  : runtime,
     }
@@ -311,14 +299,15 @@ def partition_dataset(fname, mode, num_test=1, seed=1):
     np.savetxt(fname_test, dataset_test, delimiter=',')
     print fname_train, fname_test
 
-def load_dataset_from_path(path_dataset):
-    if path_dataset is None:
-        # XXX WHAT A NIGHTMARE
-        return np.asarray([1.0234]), np.asarray([1.0234])
+def load_dataset_from_path(path_dataset, n_test):
     dataset = np.loadtxt(path_dataset, delimiter=',')
-    xs = dataset[:,0]
-    ys = dataset[:,1]
-    return (xs, ys)
+    dataset[:,0] = rescale_linear(dataset[:,0], 0, 1)
+    dataset[:,1] = rescale_linear(dataset[:,1], -1, 1)
+    xs_train = dataset[:-n_test, 0]
+    ys_train = dataset[:-n_test, 1]
+    xs_test = dataset[-n_test:, 0]
+    ys_test = dataset[-n_test:, 1]
+    return (xs_train, ys_train), (xs_test, ys_test)
 
 def make_iteration_schedule(iters, epochs, schedule):
     if schedule == 'constant':
@@ -331,14 +320,26 @@ def make_iteration_schedule(iters, epochs, schedule):
         assert False, 'Unknown schedule: %s' % (schedule,)
 
 @parsable
-def run_pipeline(path_dataset_train, path_dataset_test=None, shortname=None,
-        particles=1, iters=1, epochs=1, nprobe=10, npred_in=1, npred_out=1,
-        seed=1, schedule='constant', multiprocess=False):
+def run_pipeline(
+        path_dataset,
+        n_test=1,
+        shortname=None,
+        iters=1,
+        epochs=1,
+        nprobe_held_in=10,
+        npred_held_in=1,
+        npred_held_out=1,
+        schedule='constant',
+        seed=-1,
+    ):
     """Run synthesis pipeline and collect statistics during inference."""
-    # Load datasets from disk.
-    xs_train, ys_train = load_dataset_from_path(path_dataset_train)
-    xs_test, ys_test = load_dataset_from_path(path_dataset_test)
-    xs_probe = np.linspace(min(xs_train)+1e-3, max(xs_train)-1e-3, nprobe)
+    seed = np.random.randint(2**32-1) if seed < 0 else seed
+    # Load and prepare datasets.
+    dataset_train, dataset_test = load_dataset_from_path(path_dataset, n_test)
+    xs_train, ys_train = dataset_train
+    xs_test, ys_test = dataset_test
+    # Make the probe points for interpolated data.
+    xs_probe = np.linspace(min(xs_train)+1e-3, max(xs_train)-1e-3, nprobe_held_in)
     # Make iterations according to schedule.
     iterations = make_iteration_schedule(iters, epochs, schedule)
     print iterations
@@ -346,32 +347,29 @@ def run_pipeline(path_dataset_train, path_dataset_test=None, shortname=None,
     ripl = make_new_ripl(seed)
     ripl = run_gp_model_hyperpriors(ripl, xs_train, ys_train)
     ripl = run_gp_model_synthesizer(ripl)
-    ripl = resample_particles(ripl, particles, multiprocess)
     ripl = observe_training_set(ripl, xs_train, ys_train)
     # Run inference and collect statistics.
     statistics = [
         infer_and_predict(ripl, idx, iterations[idx], xs_test, ys_test,
-            xs_probe, npred_in, npred_out,)
+            xs_probe, npred_held_in, npred_held_out,)
         for idx in xrange(epochs)
     ]
-    filename = get_results_filename(shortname, particles, iters, epochs,
-        npred_out, seed)
+    filename = get_results_filename(shortname, n_test, iters, epochs, schedule, seed)
     filepath = '%s.json' % (os.path.join(PATH_RESULTS, filename),)
     with open(filepath, 'w') as fptr:
         json.dump({
-            'path_dataset_train'    : path_dataset_train,
-            'path_dataset_test'     : path_dataset_test,
+            'path_dataset'          : path_dataset,
+            'n_test'                : n_test,
             'xs_train'              : xs_train.tolist(),
             'ys_train'              : ys_train.tolist(),
             'xs_test'               : xs_test.tolist(),
             'ys_test'               : ys_test.tolist(),
             'xs_probe'              : xs_probe.tolist(),
-            'num_particles'         : particles,
             'num_iters'             : iters,
             'num_epochs'            : epochs,
-            'num_probe'             : nprobe,
-            'num_pred_in'           : npred_in,
-            'num_pred_out'          : npred_out,
+            'nprobe_held_in'        : nprobe_held_in,
+            'npred_held_in'         : npred_held_in,
+            'npred_held_out'        : npred_held_out,
             'seed'                  : seed,
             'statistics'            : statistics,
             'ripl'                  : base64.b64encode(ripl.saves()),
