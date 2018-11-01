@@ -4,7 +4,6 @@
 # Copyright (c) 2018 MIT Probabilistic Computing Project.
 # Released under Apache 2.0; refer to LICENSE.txt.
 
-import base64
 import json
 import os
 import sys
@@ -23,7 +22,7 @@ PATH_PLUGINS = [
 ]
 
 PATH_GP_MODEL = './resources/gp_model_0.vnts'
-PATH_RESULTS = './resources/vs-ripls'
+PATH_RESULTS = './resources/results'
 
 def timestamp():
     """Return current timestamp, up to the second."""
@@ -77,18 +76,6 @@ def make_new_ripl(seed):
     ripl = vs.make_lite_ripl(seed=seed)
     ripl = load_plugins(ripl)
     return ripl
-
-def load_serialized_ripl_string(binary, seed):
-    """Load and prepare serialized RIPL from base64 string object."""
-    ripl = make_new_ripl(seed)
-    ripl.loads(base64.b64decode(binary))
-    return ripl
-
-def load_serialized_ripl_file(path, seed):
-    """Load and prepare a serialized RIPL from a results file."""
-    with open(path, 'r') as f:
-        results = json.load(f)
-    return load_serialized_ripl_string(results['ripl'], seed)
 
 def _preprocess_dataset(dataset):
     """Subtract min from x, and mean center on y."""
@@ -371,7 +358,6 @@ def run_pipeline(
             'npred_held_out'        : npred_held_out,
             'seed'                  : seed,
             'statistics'            : statistics,
-            'ripl'                  : base64.b64encode(ripl.saves()),
             'schedule'              : schedule,
         }, fptr)
     print filepath
