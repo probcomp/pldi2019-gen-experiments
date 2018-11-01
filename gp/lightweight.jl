@@ -94,7 +94,7 @@ function inference(xs::Vector{Float64}, ys::Vector{Float64}, num_iters::Int)
 
         # randomly pick a node to expand
         covariance_fn = get_call_record(trace).retval
-        root = pick_random_node(covariance_fn, 1, max_branch)
+        root = pick_random_node_unbiased(covariance_fn, 1, max_branch)
 
         # do MH move on the subtree
         trace = mh(model, subtree_proposal, (root,), trace, correction)

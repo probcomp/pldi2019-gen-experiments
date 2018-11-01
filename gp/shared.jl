@@ -54,7 +54,8 @@ size(node::BinaryOpNode) = node.size
     pick_random_node(::Node, cur::Int, max_branch::Int)
 
 Return a random node in the subtree rooted at the given node, whose integer
-index is given.
+index is given. The sampling is biased to choose nodes at higher indexes
+in the tree.
 """
 function pick_random_node end
 
@@ -71,6 +72,34 @@ function pick_random_node(node::BinaryOpNode, cur::Int, max_branch::Int)
         else
             pick_random_node(node.right, get_child(cur, 2, max_branch), max_branch)
         end
+    end
+end
+
+
+"""
+    pick_random_node_unbiased(::Node, cur::Int, max_branch::Int)
+
+Return a random node in the subtree rooted at the given node, whose integer
+index is given. The sampling is uniform at random over all nodes in the
+tree.
+"""
+function pick_random_node_unbiased end
+
+pick_random_node_unbiased(node::LeafNode, cur::Int, max_branch::Int) = cur
+
+function pick_random_node_unbiased(node::BinaryOpNode, cur::Int, max_branch::Int)
+    probs = [1, size(node.left), size(node.right)] ./ size(node)
+    choice = categorical(probs)
+    if choice == 1
+        return cur
+    elseif choice == 2
+        n_child = get_child(cur, 1, max_branch)
+        return pick_random_node_unbiased(node.left, n_child, max_branch)
+    elseif choice == 3
+        n_child = get_child(cur, 2, max_branch)
+        return pick_random_node_unbiased(node.right, n_child, max_branch)
+    else
+        @assert false "Unexpected child node $(choice)"
     end
 end
 
