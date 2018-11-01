@@ -10,11 +10,10 @@ import os
 import sys
 import time
 
-import numpy as np
-
 from datetime import datetime
 
-import venture.lite.types as vt
+import numpy as np
+
 import venture.shortcuts as vs
 
 from parsable import parsable
@@ -24,7 +23,7 @@ PATH_PLUGINS = [
 ]
 
 PATH_GP_MODEL = './resources/gp_model_0.vnts'
-PATH_RESULTS = '/tmp'
+PATH_RESULTS = './resources/vs-ripls'
 
 def timestamp():
     """Return current timestamp, up to the second."""
