@@ -74,7 +74,6 @@ def plot_predictions(path, epoch=-1):
     """Plot the observed data and predictions from a single run."""
     with open(path, 'r') as f:
         results = json.load(f)
-    epochs = range(results['n_epochs'])
     # Extract the dataset.
     xs_probe = results['xs_probe']
     xs_train = results['xs_train']
