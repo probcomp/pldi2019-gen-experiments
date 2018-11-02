@@ -259,7 +259,7 @@ include("gp_predict.jl")
 run_pipeline(
     args["path_dataset"],
     args["n-test"],
-    args["shortname"],
+    "$(args["mode"])-$(args["shortname"])",
     args["iters"],
     args["epochs"],
     args["sched"],
