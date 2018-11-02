@@ -217,7 +217,7 @@ def infer_and_predict(ripl, idx, iters, xs_test, ys_test, xs_probe,
     log_predictive = get_particle_log_predictive(ripl, xs_test, ys_test)[0]
     predictions_held_in = get_particle_predictions(ripl, xs_probe, npred_in)
     predictions_held_out = get_particle_predictions(ripl, xs_test, npred_out)
-    asts = get_synthesized_asts(ripl)
+    ast = get_synthesized_asts(ripl)
     # Derived statistics.
     predictions_held_in_mean = np.mean(predictions_held_in, axis=0).tolist()
     predictions_held_out_mean = np.mean(predictions_held_out, axis=0).tolist()
@@ -231,7 +231,7 @@ def infer_and_predict(ripl, idx, iters, xs_test, ys_test, xs_probe,
         'log_predictive'           : log_predictive,
         'predictions_held_in'      : predictions_held_in,
         'predictions_held_out'     : predictions_held_out,
-        'asts'                     : asts,
+        'ast'                      : ast,
         # Derived statistics.
         'predictions_held_in_mean'  : predictions_held_in_mean,
         'predictions_held_out_mean' : predictions_held_out_mean,
