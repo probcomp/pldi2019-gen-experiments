@@ -104,17 +104,17 @@ def plot_predictions(path, epoch=-1):
 @parsable
 def plot_metric_evolution(path, metric):
     """Plot evolution of metric over time."""
-    df = pd.read_csv(path)
-    epochs = sorted(df['epoch'].unique())
-    particles = sorted(df['particle'].unique())
-    runtimes = [df[df['epoch']==epoch]['runtime'] for epoch in epochs[1:]]
-    metrics = [df[df['epoch']==epoch][metric] for epoch in epochs[1:]]
-    assert np.shape(runtimes) == (len(epochs)-1, len(particles))
-    assert np.shape(metrics) == (len(epochs)-1, len(particles))
+    runtimes, metrics = extract_metric_evolution(path, 'runtime', metric)
+    runtimes = runtimes[1:]
+    metrics = metrics[1:]
     x_runtime = np.cumsum(np.median(runtimes, axis=1))
-    y_metric = np.median(metrics, axis=1)
+    y_metric_median = np.median(metrics, axis=1)
+    y_metric_high = np.percentile(metrics, 75, axis=1)
+    y_metric_low = np.percentile(metrics, 25, axis=1)
     fig, ax = plt.subplots()
-    ax.plot(x_runtime, y_metric, label=metric)
+    ax.errorbar(x_runtime, y_metric_median,
+        yerr=[y_metric_median-y_metric_low, y_metric_high-y_metric_median],
+        fmt='--.', label=metric)
     ax.grid()
     # Save to disk.
     fname = path.split(os.sep)[-1]
@@ -122,10 +122,19 @@ def plot_metric_evolution(path, metric):
         fname.replace('.csv', '.evolution.metric@%s.png' % (metric,)))
     ax.set_xlabel('Runtime')
     ax.set_ylabel(metric)
-    # ax.set_xlim([0, 200])
-    # ax.set_ylim([0, 1])
     fig.savefig(fname)
     print fname
+
+def extract_metric_evolution(path, x_key, y_key):
+    """Extract the series of values from file."""
+    df = pd.read_csv(path)
+    epochs = sorted(df['epoch'].unique())
+    particles = sorted(df['particle'].unique())
+    xs = [df[df['epoch']==epoch][x_key] for epoch in epochs]
+    ys = [df[df['epoch']==epoch][y_key] for epoch in epochs]
+    assert np.shape(xs) == (len(epochs), len(particles))
+    assert np.shape(ys) == (len(epochs), len(particles))
+    return np.asarray(xs), np.asarray(ys)
 
 if __name__ == '__main__':
     parsable()
