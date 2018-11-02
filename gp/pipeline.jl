@@ -1,10 +1,5 @@
 #!/usr/bin/env julia
 
-# include("lightweight.jl")
-include("incremental.jl")
-
-include("gp_predict.jl")
-
 using Dates
 
 using ArgParse
@@ -239,10 +234,28 @@ settings = ArgParseSettings()
     "path_dataset"
         arg_type = String
         required = true
+    "mode"
+        arg_type = String
+        required = true
 end
 
 args = parse_args(settings)
 println("Running experiment with args: $(args)")
+
+# XXX There must be a better way to do this!
+# This technique works because include operates on global scope:
+# https://stackoverflow.com/questions/41288626/what-exactly-does-include-do?
+#   > include always runs at the current global scope even when called from
+#   > inside of a function.
+if args["mode"] == "lightweight"
+    include("lightweight.jl")
+elseif args["mode"] == "incremental"
+    include("incremental.jl")
+else
+    @assert false "Unknown mode: $(args["mode"])"
+end
+include("gp_predict.jl")
+
 run_pipeline(
     args["path_dataset"],
     args["n-test"],
