@@ -1,7 +1,10 @@
+#!/usr/bin/env julia
+
 include("cov_tree.jl")
 include("gp_predict.jl")
 include("pipeline_utils.jl")
 
+using ArgParse
 using JSON
 
 const PATH_RESULTS = joinpath(".", "resources", "results")
@@ -133,36 +136,40 @@ function infer_and_predict(trace, epoch::Int, iters::Int,
     )
 end
 
-function run_pipeline()
+function run_pipeline(
+        path_dataset::String,
+        n_test::Int,
+        shortname::String,
+        iters::Int,
+        epochs::Int,
+        sched::String,
+        nprobe_held_in::Int,
+        npred_held_in::Int,
+        npred_held_out::Int,
+        chains::Int,
+        seed::Int,
+    )
     # Set experiment configuration parameters
-    # XXX TODO: Accept these from command line
-    path_dataset = "resources/matlab_timeseries/01-airline.csv"
-    n_test = 20
-    shortname = "nothing"
-    iters = 1000
-    epochs = 1
-    sched = "constant"
-    nprobe_held_in = 100
-    npred_held_in = 10
-    npred_held_out = 10
-    iterations = make_iteration_schedule(iters, epochs, sched)
-    chains = 4
-
     # Prepare the held-in and held-out data.
     dataset = load_dataset_from_path(path_dataset, n_test)
     xs_train, ys_train = dataset[1]
     xs_test, ys_test = dataset[2]
     xs_probe = make_xs_probe(xs_train, nprobe_held_in)
 
-    # Each chain wil have a separate seed, and each iteration of the loop
+    # Prepare the iteration schedule.
+    iterations = make_iteration_schedule(iters, epochs, sched)
+
+    # Each chain will have a separate seed, and each iteration of the loop
     # shall correspond to an independent run. We use an inner-loop in Julia
     # as opposed to invoking independent processes to ensure that compilation
     # occurs only once.
+    main_seed = (seed == -1) ? rand(1:2^32-1) : seed
+    Random.seed!(main_seed)
     seeds = rand(1:2^32-1, chains)
-    for seed in seeds
 
+    for chain_seed in seeds
         # Run the experiment.
-        Random.seed!(seed)
+        Random.seed!(chain_seed)
         trace = initialize_trace(xs_train, ys_train)
         statistics = [
             infer_and_predict(
@@ -180,7 +187,8 @@ function run_pipeline()
         ]
 
         # Save results to disk.
-        fname = get_results_filename(shortname, n_test, iters, epochs, sched, seed)
+        fname = get_results_filename(
+            shortname, n_test, iters, epochs, sched, chain_seed)
         fpath = joinpath(PATH_RESULTS, "$(fname).json")
         result = Dict(
                 "path_dataset"          => path_dataset,
@@ -206,4 +214,58 @@ function run_pipeline()
     end
 end
 
-run_pipeline()
+
+# Main runner.
+
+settings = ArgParseSettings()
+@add_arg_table settings begin
+    "--n-test"
+        arg_type = Int
+        default = 1
+    "--shortname"
+        arg_type = String
+        default = "gen"
+    "--iters"
+        arg_type = Int
+        default = 1
+    "--epochs"
+        arg_type = Int
+        default = 1
+    "--nprobe-held-in"
+        arg_type = Int
+        default = 100
+    "--npred-held-in"
+        arg_type = Int
+        default = 10
+    "--npred-held-out"
+        arg_type = Int
+        default = 10
+    "--sched"
+        arg_type = String
+        default = "constant"
+    "--chains"
+        arg_type = Int
+        default = 4
+    "--seed"
+        arg_type = Int
+        default = -1
+    "path_dataset"
+        arg_type = String
+        required = true
+end
+
+args = parse_args(settings)
+println("Running experiment with args: $(args)")
+run_pipeline(
+    args["path_dataset"],
+    args["n-test"],
+    args["shortname"],
+    args["iters"],
+    args["epochs"],
+    args["sched"],
+    args["nprobe-held-in"],
+    args["npred-held-in"],
+    args["npred-held-out"],
+    args["chains"],
+    args["seed"],
+    )
