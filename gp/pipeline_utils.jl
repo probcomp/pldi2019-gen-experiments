@@ -1,5 +1,24 @@
-import CSV
+using CSV
+using Dates
+
 using Statistics: mean
+
+timestamp() = Dates.format(Dates.now(), "Ymdd-HMS")
+
+"""Obtain filename to save results."""
+function get_results_filename(shortname::String, n_test::Int, n_iters::Int,
+        n_epochs::Int, sched::String, seed::Int)
+    parts = [
+        ("stamp",       "$(timestamp())"),
+        ("shortname",   "$(shortname)"),
+        ("ntest",       "$(n_test)"),
+        ("iters",       "$(n_iters)"),
+        ("epochs",      "$(n_epochs)"),
+        ("schedule",    "$(sched)"),
+        ("seed",        "$(seed)"),
+    ]
+    return join((join(part, "@") for part in parts), "_")
+end
 
 """Rescale data linearly between [yl, yh]."""
 function rescale_linear(xs::Vector{Float64}, yl::Float64, yh::Float64)
