@@ -1,4 +1,8 @@
-include("shared.jl")
+include("cov_tree.jl")
+include("gp_predict.jl")
+include("pipeline_utils.jl")
+
+using PyPlot
 
 @gen function covariance_prior(cur::Int)
     node_type = @addr(categorical(node_dist), (cur, :type))
@@ -25,16 +29,16 @@ include("shared.jl")
 
     # plus combinator
     elseif node_type == PLUS
-        child1 = get_child(cur, 1, max_branch)
-        child2 = get_child(cur, 2, max_branch)
+        child1 = Gen.get_child(cur, 1, max_branch)
+        child2 = Gen.get_child(cur, 2, max_branch)
         left = @splice(covariance_prior(child1))
         right = @splice(covariance_prior(child2))
         node = Plus(left, right)
 
     # times combinator
     elseif node_type == TIMES
-        child1 = get_child(cur, 1, max_branch)
-        child2 = get_child(cur, 2, max_branch)
+        child1 = Gen.get_child(cur, 1, max_branch)
+        child2 = Gen.get_child(cur, 2, max_branch)
         left = @splice(covariance_prior(child1))
         right = @splice(covariance_prior(child2))
         node = Times(left, right)
@@ -169,7 +173,7 @@ function run_pipeline()
         ax[:plot](xs_test, ys_pred_held_out, color="g")
         ax[:set_xlim]((0, 1.5))
         ax[:set_ylim]((-1.5, 1.5))
-        ax[:legend](true, loc="upper left")
+        ax[:legend](loc="upper left")
         fig[:set_tight_layout](true)
         fig[:set_size_inches](6,6)
         fig[:savefig]("resources/lightweight_seed@$(seed).png")
