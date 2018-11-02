@@ -3,6 +3,7 @@ using Dates
 
 using Statistics: mean
 
+"""Return current timestamp."""
 timestamp() = Dates.format(Dates.now(), "Ymdd-HMS")
 
 """Obtain filename to save results."""

@@ -134,6 +134,8 @@ function infer_and_predict(trace, epoch::Int, iters::Int,
 end
 
 function run_pipeline()
+    # Set experiment configuration parameters
+    # XXX TODO: Accept these from command line
     path_dataset = "resources/matlab_timeseries/01-airline.csv"
     n_test = 20
     shortname = "nothing"
