@@ -49,19 +49,10 @@ end
 
 @gen function model(xs::Vector{Float64})
     n = length(xs)
-
-    # sample covariance function
     covariance_fn::Node = @addr(covariance_prior(1), :tree)
-
-    # sample diagonal noise
     noise = @addr(gamma(1, 1), :noise) + 0.01
-
-    # compute covariance matrix
     cov_matrix = compute_cov_matrix_vectorized(covariance_fn, noise, xs)
-
-    # sample from multivariate normal
     @addr(mvnormal(zeros(n), cov_matrix), :ys)
-
     return covariance_fn
 end
 
@@ -79,68 +70,110 @@ function correction(prev_trace, new_trace)
     log(prev_size) - log(new_size)
 end
 
-function inference(xs::Vector{Float64}, ys::Vector{Float64}, num_iters::Int)
-
-    # observed data
+function initialize_trace(xs::Vector{Float64}, ys::Vector{Float64})
     constraints = DynamicAssignment()
     constraints[:ys] = ys
-
-    # generate initial trace consistent with observed data
     (trace, _) = generate(model, (xs,), constraints)
-
-    # do MCMC
-    local covariance_fn::Node
-    for iter=1:num_iters
-
-        # randomly pick a node to expand
-        covariance_fn = get_call_record(trace).retval
-        root = pick_random_node_unbiased(covariance_fn, 1, max_branch)
-
-        # do MH move on the subtree
-        trace = mh(model, subtree_proposal, (root,), trace, correction)
-
-        # do MH move on the top-level white noise
-        trace = mh(model, noise_proposal, (), trace)
-    end
-
     return trace
 end
 
-function experiment()
-
-    # load and rescale the airline dataset
-    (xs, ys) = get_airline_dataset()
-
-    # get the x values to predict on (observed range as well as forecasts)
-    new_xs = collect(range(0, stop=1.5, length=200))
-
-    # set seed
-    Random.seed!(0)
-
-    fig, axess = PyPlot.subplots(4,4)
-    for (i, ax) in zip(1:16, axess)
-        # subplot(4, 4, i)
-
-        # do inference, time it
-        @time trace = inference(xs, ys, 1000)
+function run_mcmc(trace, iters::Int)
+    for iter=1:iters
         covariance_fn = get_call_record(trace).retval
-        noise = get_assignment(trace)[:noise]
-
-        # sample predictions
-        new_ys = predict_ys(covariance_fn, noise, xs, ys, new_xs)
-
-        # plot observed data
-        ax[:plot](xs, ys, color="black")
-
-        # plot predictions
-        ax[:plot](new_xs, new_ys, color="red")
-
-        ax[:set_xlim]((0, 1.5))
-        ax[:set_ylim]((-1.5, 1.5))
+        root = pick_random_node_unbiased(covariance_fn, 1, max_branch)
+        trace = mh(model, subtree_proposal, (root,), trace, correction)
+        trace = mh(model, noise_proposal, (), trace)
     end
-    fig[:set_tight_layout](true)
-    fig[:set_size_inches](20, 14)
-    fig[:savefig]("resources/lightweight.png")
+    return trace
 end
 
-experiment()
+function infer_and_predict(trace, epoch::Int, iters::Int,
+        xs_train::Vector{Float64}, ys_train::Vector{Float64},
+        xs_test::Vector{Float64}, ys_test::Vector{Float64},
+        xs_probe::Vector{Float64}, npred_in::Int, npred_out::Int)
+    # Run MCMC inference and collect measurements and statistics.
+    start = time()
+    trace = run_mcmc(trace, iters)
+    runtime = time() - start
+    println("Completed $(iters) iterations in $(runtime) seconds")
+    # Collect statistics.
+    cov = get_call_record(trace).retval
+    noise = get_assignment(trace)[:noise]
+    # Run predictions.
+    predictions_held_in = gp_predictive_samples(
+        cov, noise, xs_train, ys_train, xs_probe, npred_in)
+    predictions_held_out = gp_predictive_samples(
+        cov, noise, xs_train, ys_train, xs_test, npred_out)
+    log_predictive = compute_log_likelihood_predictive(
+        cov, noise, xs_train, ys_train, xs_test, ys_test)
+    predictions_held_in_mean = gp_predictive_samples(
+        cov, noise, xs_train, ys_train, xs_probe)
+    predictions_held_out_mean =gp_predictive_samples(
+        cov, noise, xs_train, ys_train, xs_test)
+    rmse = compute_rmse(ys_test, predictions_held_out_mean)
+    return Dict(
+        "iters"                     => iters,
+        "log_weight"                => 0,
+        "log_joint"                 => 0,
+        "log_likelihood"            => 0,
+        "log_prior"                 => 0,
+        "log_predictive"            => log_predictive,
+        "predictions_held_in"       => predictions_held_in,
+        "predictions_held_out"      => predictions_held_out,
+        "predictions_held_in_mean"  => predictions_held_in_mean,
+        "predictions_held_out_mean" => predictions_held_out_mean,
+        "rmse"                      => rmse,
+        "runtime"                   => runtime,
+    )
+end
+
+function run_pipeline()
+    path_dataset = "resources/matlab_timeseries/01-airline.csv"
+    n_test = 20
+    shortname = "nothing"
+    iters = 1000
+    epochs = 1
+    sched = "constant"
+    nprobe_held_in = 100
+    npred_held_in = 10
+    npred_held_out = 10
+    iterations = make_iteration_schedule(iters, epochs, sched)
+    chains = 4
+
+    dataset = load_dataset_from_path(path_dataset, n_test)
+    xs_train, ys_train = dataset[1]
+    xs_test, ys_test = dataset[2]
+
+    xs_probe = make_xs_probe(xs_train, nprobe_held_in)
+    seeds = rand(1:2^32-1, chains)
+
+    for seed in seeds
+        Random.seed!(seed)
+        trace = initialize_trace(xs_train, ys_train)
+        statistics = [
+            infer_and_predict(trace, epoch, iter, xs_train, ys_train,
+                xs_test, ys_test, xs_probe, npred_held_in, npred_held_out)
+            for (epoch, iter) in enumerate(iterations)
+        ]
+        for stats in statistics
+            println(stats)
+        end
+
+        ys_pred_held_in = statistics[end]["predictions_held_in_mean"]
+        ys_pred_held_out = statistics[end]["predictions_held_out_mean"]
+
+        fig, ax = PyPlot.subplots()
+        ax[:scatter](xs_train, ys_train, marker="x", color="k", label="Observed Data")
+        ax[:scatter](xs_test, ys_test, marker="x", color="r", label="Test Data")
+        ax[:plot](xs_probe, ys_pred_held_in, color="g")
+        ax[:plot](xs_test, ys_pred_held_out, color="g")
+        ax[:set_xlim]((0, 1.5))
+        ax[:set_ylim]((-1.5, 1.5))
+        ax[:legend](true, loc="upper left")
+        fig[:set_tight_layout](true)
+        fig[:set_size_inches](6,6)
+        fig[:savefig]("resources/lightweight_seed@$(seed).png")
+    end
+end
+
+run_pipeline()
