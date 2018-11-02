@@ -142,6 +142,9 @@ function run_pipeline(
     # Prepare the iteration schedule.
     iterations = make_iteration_schedule(iters, epochs, sched)
 
+    # XXX Major hack, add 1 epoch with 1 iteration for JIT.
+    iterations = vcat([1], iterations)
+
     # Each chain will have a separate seed, and each iteration of the loop
     # shall correspond to an independent run. We use an inner-loop in Julia
     # as opposed to invoking independent processes to ensure that compilation
