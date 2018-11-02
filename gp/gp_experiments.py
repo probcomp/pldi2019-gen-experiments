@@ -233,8 +233,8 @@ def infer_and_predict(ripl, idx, iters, xs_test, ys_test, xs_probe,
         'predictions_held_out'     : predictions_held_out,
         'asts'                     : asts,
         # Derived statistics.
-        'predictions_heldin_mean'  : predictions_held_in_mean,
-        'predictions_heldout_mean' : predictions_held_out_mean,
+        'predictions_held_in_mean'  : predictions_held_in_mean,
+        'predictions_held_out_mean' : predictions_held_out_mean,
         'rmse'                     : rmse,
         'runtime'                  : runtime,
     }
