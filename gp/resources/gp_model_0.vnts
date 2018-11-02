@@ -3,7 +3,7 @@
 assume get_tree_root = () -> {1};
 
 assume get_base_kernel_index ~ mem((node_index) ~> {
-    uniform_discrete(1,5) #tree #structure:node_index
+    uniform_discrete(1,5) #tree:node_index
 });
 
 
@@ -32,12 +32,12 @@ assume choose_primitive =  mem((node_index) ~> {
 
 assume choose_operator = mem((node_index) ~> {
     operator_symbol ~ categorical(simplex(.5, .5), ["+", "*"])
-        #tree #structure:pair("operator", node_index);
+        #tree #tree:pair("operator", node_index);
     operator_symbol
 });
 
 assume generate_random_covariance_ast = mem((node_index) ~> {
-    if (flip(0.3) #tree #structure:pair("branch", node_index)) {
+    if (flip(0.3) #tree #tree:pair("branch", node_index)) {
         operator ~ choose_operator(node_index);
         [
             operator,

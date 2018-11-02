@@ -114,7 +114,7 @@ def run_gp_model_hyperpriors(ripl, xs, ys):
     assume x_max = %1.10f;   // maximum of observed input
     assume y_max = %1.10f;   // maximum of observed output
     assume get_hyper_prior ~ mem((node_index) -> {
-        uniform_continuous(0, 1) #tree #hypers:node_index
+        uniform_continuous(0, 1) #tree:node_index
         // if (node_index[0] == "WN" or node_index[0] == "C") {
         //     uniform_continuous(0, y_max) #hypers:node_index
         // } else {
