@@ -1,6 +1,7 @@
 #!/usr/bin/env julia
 
 include("lightweight.jl")
+include("gp_predict.jl")
 
 using Dates
 

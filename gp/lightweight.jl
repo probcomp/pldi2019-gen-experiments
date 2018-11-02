@@ -1,5 +1,4 @@
 include("cov_tree.jl")
-include("gp_predict.jl")
 
 @gen function covariance_prior(cur::Int)
     node_type = @addr(categorical(node_dist), (cur, :type))
