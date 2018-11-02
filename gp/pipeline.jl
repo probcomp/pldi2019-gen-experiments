@@ -102,7 +102,7 @@ function infer_and_predict(trace, epoch::Int, iters::Int,
     predictions_held_out_mean =gp_predictive_samples(
         cov, noise, xs_train, ys_train, xs_test)
     rmse = compute_rmse(ys_test, predictions_held_out_mean)
-    return Dict(
+    results = Dict(
         "iters"                     => iters,
         "log_weight"                => 0,
         "log_joint"                 => 0,
@@ -116,6 +116,7 @@ function infer_and_predict(trace, epoch::Int, iters::Int,
         "rmse"                      => rmse,
         "runtime"                   => runtime,
     )
+    return trace, results
 end
 
 function run_pipeline(
@@ -153,21 +154,13 @@ function run_pipeline(
         # Run the experiment.
         Random.seed!(chain_seed)
         trace = initialize_trace(xs_train, ys_train)
-        statistics = [
-            infer_and_predict(
-                trace,
-                epoch,
-                iter,
-                xs_train,
-                ys_train,
-                xs_test,
-                ys_test,
-                xs_probe,
-                npred_held_in,
-                npred_held_out,
-            ) for (epoch, iter) in enumerate(iterations)
-        ]
-
+        statistics = []
+        for (epoch, iter) in enumerate(iterations)
+            trace, results = infer_and_predict(
+                trace, epoch, iter, xs_train, ys_train, xs_test, ys_test,
+                xs_probe, npred_held_in, npred_held_out,)
+            append!(statistics, results)
+        end
         # Save results to disk.
         fname = get_results_filename(
             shortname, n_test, iters, epochs, sched, chain_seed)
