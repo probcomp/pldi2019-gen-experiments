@@ -2,7 +2,9 @@ include("cov_tree.jl")
 include("gp_predict.jl")
 include("pipeline_utils.jl")
 
-using PyPlot
+using JSON
+
+const PATH_RESULTS = joinpath(".", "resources", "results")
 
 @gen function covariance_prior(cur::Int)
     node_type = @addr(categorical(node_dist), (cur, :type))
@@ -144,39 +146,61 @@ function run_pipeline()
     iterations = make_iteration_schedule(iters, epochs, sched)
     chains = 4
 
+    # Prepare the held-in and held-out data.
     dataset = load_dataset_from_path(path_dataset, n_test)
     xs_train, ys_train = dataset[1]
     xs_test, ys_test = dataset[2]
-
     xs_probe = make_xs_probe(xs_train, nprobe_held_in)
-    seeds = rand(1:2^32-1, chains)
 
+    # Each chain wil have a separate seed, and each iteration of the loop
+    # shall correspond to an independent run. We use an inner-loop in Julia
+    # as opposed to invoking independent processes to ensure that compilation
+    # occurs only once.
+    seeds = rand(1:2^32-1, chains)
     for seed in seeds
+
+        # Run the experiment.
         Random.seed!(seed)
         trace = initialize_trace(xs_train, ys_train)
         statistics = [
-            infer_and_predict(trace, epoch, iter, xs_train, ys_train,
-                xs_test, ys_test, xs_probe, npred_held_in, npred_held_out)
-            for (epoch, iter) in enumerate(iterations)
+            infer_and_predict(
+                trace,
+                epoch,
+                iter,
+                xs_train,
+                ys_train,
+                xs_test,
+                ys_test,
+                xs_probe,
+                npred_held_in,
+                npred_held_out,
+            ) for (epoch, iter) in enumerate(iterations)
         ]
-        for stats in statistics
-            println(stats)
+
+        # Save results to disk.
+        fname = get_results_filename(shortname, n_test, iters, epochs, sched, seed)
+        fpath = joinpath(PATH_RESULTS, "$(fname).json")
+        result = Dict(
+                "path_dataset"          => path_dataset,
+                "n_test"                => n_test,
+                "xs_train"              => xs_train,
+                "ys_train"              => ys_train,
+                "xs_test"               => xs_test,
+                "ys_test"               => ys_test,
+                "xs_probe"              => xs_probe,
+                "n_iters"               => iters,
+                "n_epochs"              => epochs,
+                "nprobe_held_in"        => nprobe_held_in,
+                "npred_held_in"         => npred_held_in,
+                "npred_held_out"        => npred_held_out,
+                "seed"                  => seed,
+                "statistics"            => statistics,
+                "schedule"              => sched,
+        )
+        open(fpath, "w") do f
+            write(f, JSON.json(result))
+            println(fpath)
         end
-
-        ys_pred_held_in = statistics[end]["predictions_held_in_mean"]
-        ys_pred_held_out = statistics[end]["predictions_held_out_mean"]
-
-        fig, ax = PyPlot.subplots()
-        ax[:scatter](xs_train, ys_train, marker="x", color="k", label="Observed Data")
-        ax[:scatter](xs_test, ys_test, marker="x", color="r", label="Test Data")
-        ax[:plot](xs_probe, ys_pred_held_in, color="g")
-        ax[:plot](xs_test, ys_pred_held_out, color="g")
-        ax[:set_xlim]((0, 1.5))
-        ax[:set_ylim]((-1.5, 1.5))
-        ax[:legend](loc="upper left")
-        fig[:set_tight_layout](true)
-        fig[:set_size_inches](6,6)
-        fig[:savefig]("resources/lightweight_seed@$(seed).png")
     end
 end
 
