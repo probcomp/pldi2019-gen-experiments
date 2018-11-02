@@ -162,7 +162,7 @@ function run_pipeline(
             trace, results = infer_and_predict(
                 trace, epoch, iter, xs_train, ys_train, xs_test, ys_test,
                 xs_probe, npred_held_in, npred_held_out,)
-            append!(statistics, results)
+            append!(statistics, [results])
         end
         # Save results to disk.
         fname = get_results_filename(
