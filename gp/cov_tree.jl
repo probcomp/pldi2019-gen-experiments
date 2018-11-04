@@ -1,7 +1,23 @@
 import LinearAlgebra
 import Random
 
-using Gen
+
+"""Sample a categorical variable with given weights."""
+function sample_categorical(probs::Vector{Float64})
+    u = rand()
+    cdf = cumsum(probs)
+    for (i, c) in enumerate(cdf)
+        if u < c return i end
+    end
+end
+
+
+"""Return index of child node in a tree."""
+function get_child(parent::Int, child_num::Int, max_branch::Int)
+    @assert child_num >= 1 && child_num <= max_branch
+    (parent - 1) * max_branch + child_num + 1
+end
+
 
 """Node in a tree representing a covariance function"""
 abstract type Node end
@@ -156,18 +172,18 @@ pick_random_node(node::LeafNode, cur::Int, max_branch::Int) = cur
 
 
 function pick_random_node(node::BinaryOpNode, cur::Int, max_branch::Int)
-    if bernoulli(0.5)
-        # pick this node
-        cur
+    probs = [.5, .25, .25]
+    choice = sample_categorical(probs)
+    if choice == 1
+        return cur
+    elseif choice == 2
+        n_child = get_child(cur, 1, max_branch)
+        return pick_random_node(node.left, n_child, max_branch)
+    elseif choice == 3
+        n_child = get_child(cur, 2, max_branch)
+        return pick_random_node(node.right, n_child, max_branch)
     else
-        # recursively pick from the subtrees
-        if bernoulli(0.5)
-            n_child = Gen.get_child(cur, 1, max_branch)
-            pick_random_node(node.left, n_child, max_branch)
-        else
-            n_child = Gen.get_child(cur, 2, max_branch)
-            pick_random_node(node.right, n_child, max_branch)
-        end
+        @assert false "Unexpected child node $(choice)"
     end
 end
 
@@ -187,14 +203,14 @@ pick_random_node_unbiased(node::LeafNode, cur::Int, max_branch::Int) = cur
 
 function pick_random_node_unbiased(node::BinaryOpNode, cur::Int, max_branch::Int)
     probs = [1, size(node.left), size(node.right)] ./ size(node)
-    choice = categorical(probs)
+    choice = sample_categorical(probs)
     if choice == 1
         return cur
     elseif choice == 2
-        n_child = Gen.get_child(cur, 1, max_branch)
+        n_child = get_child(cur, 1, max_branch)
         return pick_random_node_unbiased(node.left, n_child, max_branch)
     elseif choice == 3
-        n_child = Gen.get_child(cur, 2, max_branch)
+        n_child = get_child(cur, 2, max_branch)
         return pick_random_node_unbiased(node.right, n_child, max_branch)
     else
         @assert false "Unexpected child node $(choice)"

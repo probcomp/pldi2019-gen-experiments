@@ -1,5 +1,7 @@
 include("cov_tree.jl")
 
+using Gen
+
 """
 Data type used in return value of the production kernel (V).
 """
