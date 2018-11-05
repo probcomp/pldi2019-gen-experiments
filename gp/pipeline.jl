@@ -88,8 +88,7 @@ function infer_and_predict(trace, epoch::Int, iters::Int,
     runtime = time() - start
     println("Completed $(iters) iterations in $(runtime) seconds")
     # Collect statistics.
-    cov = get_call_record(trace).retval
-    noise = get_assignment(trace)[:noise]
+    cov, noise = extract_cov_noise(trace)
     # Run predictions.
     predictions_held_in = gp_predictive_samples(
         cov, noise, xs_train, ys_train, xs_probe, npred_in)
@@ -245,12 +244,15 @@ println("Running experiment with args: $(args)")
 #   > inside of a function.
 if args["mode"] == "lightweight"
     include("lightweight.jl")
+    include("gp_predict.jl")
 elseif args["mode"] == "incremental"
     include("incremental.jl")
+    include("gp_predict.jl")
+elseif args["mode"] == "handcoded"
+    include("handcoded.jl")
 else
     @assert false "Unknown mode: $(args["mode"])"
 end
-include("gp_predict.jl")
 
 run_pipeline(
     args["path_dataset"],

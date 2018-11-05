@@ -225,3 +225,9 @@ function run_mcmc(trace, iters::Int)
     end
     return trace
 end
+
+function extract_cov_noise(trace)
+    cov = get_call_record(trace).retval
+    noise = get_assignment(trace)[:noise]
+    return (cov, noise)
+end
