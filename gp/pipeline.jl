@@ -96,9 +96,9 @@ function infer_and_predict(trace, epoch::Int, iters::Int,
         cov, noise, xs_train, ys_train, xs_test, npred_out)
     log_predictive = compute_log_likelihood_predictive(
         cov, noise, xs_train, ys_train, xs_test, ys_test)
-    predictions_held_in_mean = gp_predictive_samples(
+    predictions_held_in_mean = gp_predictive_mean(
         cov, noise, xs_train, ys_train, xs_probe)
-    predictions_held_out_mean =gp_predictive_samples(
+    predictions_held_out_mean = gp_predictive_mean(
         cov, noise, xs_train, ys_train, xs_test)
     rmse = compute_rmse(ys_test, predictions_held_out_mean)
     results = Dict(
