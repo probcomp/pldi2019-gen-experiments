@@ -139,21 +139,9 @@ git-tree-sha1 = "49bf793ebd37db5adaa7ac1eae96c2c97ec86db5"
 uuid = "069b7b12-0de2-55c6-9aab-29f3d0a68a2e"
 version = "1.0.0"
 
-[[FunctionalCollections]]
-deps = ["Test"]
-path = "/path/to/FunctionalCollections.jl"
-uuid = "de31a74c-ac4f-5751-b3fd-e18cd04993ca"
-version = "0.4.0+"
-
 [[Future]]
 deps = ["Random"]
 uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
-
-[[Gen]]
-deps = ["DataStructures", "Distributions", "FunctionalCollections", "JSON", "LinearAlgebra", "ReverseDiff", "SpecialFunctions"]
-path = "/path/to/Gen.jl"
-uuid = "ea4f424c-a589-11e8-07c0-fd5c91b9da4a"
-version = "0.1.0"
 
 [[InteractiveUtils]]
 deps = ["LinearAlgebra", "Markdown"]
