@@ -1,7 +1,7 @@
 # pldi2019-gen-experiments
 Experiments for PLDI 2019 submission on Gen
 
-Basic instructions to run the experiments.
+## Basic instructions to set up the Julia environment.
 
 1. Download and install Julia v0.7
 
