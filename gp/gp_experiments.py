@@ -41,6 +41,12 @@ def rescale_linear(xs, yl, yh):
     intercept = yh - xh * slope
     return slope* xs + intercept
 
+def unscale_linear(xs, yl, yh, xl, xh):
+    """Rescale values linearly between [xl, xh]."""
+    slope = float(yh - yl) / (xh - xl)
+    intercept = yh - xh * slope
+    return (xs - intercept) / slope
+
 def get_results_filename(shortname, n_test, n_iters, n_epochs, schedule, seed):
     """Return filename to store results of given pipeline invocation."""
     parts = [
