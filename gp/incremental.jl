@@ -1,4 +1,4 @@
-include("shared.jl")
+include("cov_tree.jl")
 
 """
 Data type used in return value of the production kernel (V).
@@ -112,7 +112,7 @@ end
 
     # don't provide any information about the change in return value
     @diff @retdiff(CovFnAndMatrixDiff())
-    
+
     # to be passed to the parent aggregation kernel application
     w = CovFnAndMatrix(node, cov_matrix)
 
@@ -141,20 +141,20 @@ const covariance_prior = Tree(
     n = length(xs)
     cov_matrix = cov_fn_and_matrix.cov_matrix + Matrix(noise * LinearAlgebra.I, n, n)
 
-    # sample from multivariate normal   
+    # sample from multivariate normal
     @addr(mvnormal(zeros(n), cov_matrix), :ys)
 
     return cov_fn_and_matrix.node
 end
 
 @gen function subtree_proposal_recursive(cur::Int)
-    
+
     # base address for production kernel application 'cur'
     prod_addr = (cur, Val(:production))
 
     # base address for aggregation kernel application 'cur'
     agg_addr = (cur, Val(:aggregation))
-    
+
     # sample node type
     node_type = @addr(categorical(node_dist), (cur, Val(:production)) => :type)
 
@@ -177,15 +177,15 @@ end
 
     # plus combinator
     elseif node_type == PLUS
-        child1 = get_child(cur, 1, max_branch)
-        child2 = get_child(cur, 2, max_branch)
+        child1 = Gen.get_child(cur, 1, max_branch)
+        child2 = Gen.get_child(cur, 2, max_branch)
         @splice(subtree_proposal_recursive(child1))
         @splice(subtree_proposal_recursive(child2))
 
     # times combinator
     elseif node_type == TIMES
-        child1 = get_child(cur, 1, max_branch)
-        child2 = get_child(cur, 2, max_branch)
+        child1 = Gen.get_child(cur, 1, max_branch)
+        child2 = Gen.get_child(cur, 2, max_branch)
         @splice(subtree_proposal_recursive(child1))
         @splice(subtree_proposal_recursive(child2))
 
@@ -209,64 +209,25 @@ function correction(prev_trace, new_trace)
     log(prev_size) - log(new_size)
 end
 
-function inference(xs::Vector{Float64}, ys::Vector{Float64}, num_iters::Int)
-
-    # observed data
+function initialize_trace(xs::Vector{Float64}, ys::Vector{Float64})
     constraints = DynamicAssignment()
     constraints[:ys] = ys
-
-    # generate initial trace consistent with observed data
     (trace, _) = generate(model, (xs,), constraints)
+    return trace
+end
 
-    # do MCMC
-    local covariance_fn::Node
-    for iter=1:num_iters
-
-        # randomly pick a node to expand
+function run_mcmc(trace, iters::Int)
+    for iter=1:iters
         covariance_fn = get_call_record(trace).retval
-        root = pick_random_node(covariance_fn, 1, max_branch)
-
-        # do MH move on the subtree
+        root = pick_random_node_unbiased(covariance_fn, 1, max_branch)
         trace = mh(model, subtree_proposal, (root,), trace, correction)
-        
-        # do MH move on the top-level white noise
         trace = mh(model, noise_proposal, (), trace)
     end
+    return trace
+end
+
+function extract_cov_noise(trace)
+    cov = get_call_record(trace).retval
     noise = get_assignment(trace)[:noise]
-    return (covariance_fn, noise)
+    return (cov, noise)
 end
-
-function experiment()
-
-    # load and rescale the airline dataset
-    (xs, ys) = get_airline_dataset()
-
-    # get the x values to predict on (observed range as well as forecasts)
-    new_xs = collect(range(0, stop=1.5, length=200))
-
-    # set seed
-    Random.seed!(0)
-
-    figure(figsize=(32,32))
-    for i=1:16
-        subplot(4, 4, i)
-
-        # do inference, time it
-        @time (covariance_fn, noise) = inference(xs, ys, 1000)
-
-        # sample predictions
-        new_ys = predict_ys(covariance_fn, noise, xs, ys, new_xs)
-
-        # plot observed data
-        plot(xs, ys, color="black")
-
-        # plot predictions
-        plot(new_xs, new_ys, color="red")
-
-        gca()[:set_xlim]((0, 1.5))
-        gca()[:set_ylim]((-3, 3))
-    end
-    savefig("incremental.png")
-end
-
-experiment()
