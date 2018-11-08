@@ -35,13 +35,14 @@ Basic instructions to run the experiments.
 
 9. Test your installation worked by running an experiment, e.g.
 
-    $ cd pldi2019-gen-experiments/gp
-    $ ./pipeline.jl --n-test=20 \
-        --nprobe-held-in=2 \
-        --npred-held-in=1 \
-        --shortname=nVzAI \
-        --iters=5 \
-        --epochs=1000 \
-        --chains=1 \
-        ./resources/matlab_timeseries/01-airline.csv \
-        incremental
+        $ cd pldi2019-gen-experiments/gp
+
+        $ ./pipeline.jl --n-test=20 \
+            --nprobe-held-in=2 \
+            --npred-held-in=1 \
+            --shortname=nVzAI \
+            --iters=5 \
+            --epochs=1000 \
+            --chains=1 \
+            ./resources/matlab_timeseries/01-airline.csv \
+            incremental
