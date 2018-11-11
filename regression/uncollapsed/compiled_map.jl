@@ -145,16 +145,3 @@ function do_inference(n)
 end
 
 scores = do_inference(500)
-
-# iters = 100
-# @time do_inference(iters)
-# @time scores = do_inference(iters)
-
-# using PyPlot
-
-# figure(figsize=(4, 2))
-# plot(scores)
-# ylabel("Log probability density")
-# xlabel("Iterations of loop of Lines 12-24")
-# tight_layout()
-# savefig("scores.png")
