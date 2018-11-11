@@ -4,7 +4,8 @@ include("../shared.jl")
 # model #
 #########
 
-@gen function datum(x::Float64, @ad(inlier_std), @ad(outlier_std), @ad(slope), @ad(intercept))
+@gen function datum(x::Float64,
+        @ad(inlier_std), @ad(outlier_std), @ad(slope), @ad(intercept))
     is_outlier = @addr(bernoulli(0.5), :z)
     std = is_outlier ? inlier_std : outlier_std
     y = @addr(normal(x * slope + intercept, sqrt(exp(std))), :y)
@@ -90,8 +91,6 @@ function do_inference(n)
         for j=1:length(xs)
             trace = mh(model, is_outlier_proposal, (j,), trace)
         end
-
-        score = get_call_record(trace).score
 
         # report loop stats
         score = get_call_record(trace).score
