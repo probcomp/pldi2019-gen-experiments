@@ -95,7 +95,6 @@ function do_inference(n)
         # report loop stats
         score = get_call_record(trace).score
         assignment = get_assignment(trace)
-        score = get_call_record(trace).score
         println((score,
             assignment[:slope],
             assignment[:intercept],
