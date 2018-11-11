@@ -113,5 +113,3 @@ function do_inference(n)
 end
 
 (score, inlier_std, outlier_std, slope, intercept) = do_inference(500)
-
-# @time do_inference(500)

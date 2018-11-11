@@ -17,15 +17,18 @@ function Base.fill(x::ReverseDiff.TrackedReal{V,D,O}, n::Integer) where {V,D,O}
     return out
 end
 
-@noinline function ReverseDiff.special_reverse_exec!(instruction::ReverseDiff.SpecialInstruction{typeof(fill)})
+@noinline function ReverseDiff.special_reverse_exec!(
+        instruction::ReverseDiff.SpecialInstruction{typeof(fill)})
     x, n = instruction.input
     output = instruction.output
-    ReverseDiff.istracked(x) && ReverseDiff.increment_deriv!(x, sum(ReverseDiff.deriv(output)))
+    ReverseDiff.istracked(x) &&
+        ReverseDiff.increment_deriv!(x, sum(ReverseDiff.deriv(output)))
     ReverseDiff.unseed!(output)
     return nothing
 end
 
-@noinline function ReverseDiff.special_forward_exec!(instruction::ReverseDiff.SpecialInstruction{typeof(fill)})
+@noinline function ReverseDiff.special_forward_exec!(
+        instruction::ReverseDiff.SpecialInstruction{typeof(fill)})
     x, n = instruction.input
     ReverseDiff.value!(instruction.output, fill(ReverseDiff.value(x), n))
     return nothing
