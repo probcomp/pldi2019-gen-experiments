@@ -1,5 +1,7 @@
 using Gen
 import Random
+using DataFrames
+using CSV
 
 ##########
 # RANSAC #
@@ -287,8 +289,8 @@ function do_gradient_inference(n)
     print_trace(trace)
     init_trace = trace
 
-    slope_selection = Gen.select(:slope)
-    intercept_selection = Gen.select(:intercept)
+    #slope_selection = Gen.select(:slope)
+    #intercept_selection = Gen.select(:intercept)
     selection = Gen.select(:slope, :intercept)
 
     for i=1:n
@@ -455,14 +457,47 @@ function do_inference(n)
     return (init_trace, trace, elapsed, scores)
 end
 
+# precompile
+(init_trace, trace, elapsed1, scores1) = do_generic_inference(10) # prog 1 
+(init_trace, trace, elapsed2, scores2) = do_ransac_inference(10)  # prog 3
+(init_trace, trace, elapsed3, scores3) = do_gradient_inference(10) # prog 2
+
+Random.seed!(1)
+
 println("generic inference..")
-(init_trace, trace, elapsed, scores) = do_generic_inference(100)
+(init_trace, trace, elapsed1, scores1) = do_generic_inference(1000) # blue (prog 1)
 
 println("ransac inference..")
-(init_trace, trace, elapsed, scores) = do_ransac_inference(100)
+(init_trace, trace, elapsed2, scores2) = do_ransac_inference(100)  # orange (prog 3)
 
 println("gradient inference..")
-(init_trace, trace, elapsed, scores) = do_gradient_inference(100)
+(init_trace, trace, elapsed3, scores3) = do_gradient_inference(100) # green (prog 2)
+
+df = DataFrame()
+df[:elapsed] = elapsed1
+df[:scores] = scores1
+CSV.write("example-data-prog1.csv", df)
+
+df = DataFrame()
+df[:elapsed] = elapsed2
+df[:scores] = scores2
+CSV.write("example-data-prog3.csv", df)
+
+df = DataFrame()
+df[:elapsed] = elapsed3
+df[:scores] = scores3
+CSV.write("example-data-prog2.csv", df)
+
+figure(figsize=(4,3))
+plot(elapsed1[2:2:end], scores1[2:2:end], color="blue", label="Inference Program 1")
+plot(elapsed3[2:end], scores3[2:end], color="green", label="Inference Program 2")
+plot(elapsed2[2:end], scores2[2:end], color="orange", label="Inference Program 3")
+legend(loc="lower right")
+ylabel("Log Probability")
+xlabel("seconds")
+gca()[:set_xlim]((0, 8))
+tight_layout()
+savefig("scores.pdf")
 
 exit()
 
