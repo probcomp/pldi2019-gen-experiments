@@ -114,7 +114,6 @@ function do_inference(n)
         end
 
         # report loop stats
-        score = get_call_record(trace).score
         assignment = get_assignment(trace)
         score = get_call_record(trace).score
         println((score, assignment[:inlier_std], assignment[:outlier_std],
