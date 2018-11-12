@@ -72,8 +72,8 @@ function logpdf_grad(::TwoNormals, x, mu, sigma1, sigma2)
     return (
         deriv_x,
         w1 * deriv_mu_1 + w2 * deriv_mu_2,
-        w1 * deriv_std_1,
-        w2 * deriv_std_2,
+        NaN,
+        NaN,
     )
 end
 
@@ -86,26 +86,20 @@ function random(::TwoNormals, mu, sigma1, sigma2)
 end
 
 has_output_grad(::TwoNormals) = true
-has_argument_grads(::TwoNormals) = (true, true, true)
+has_argument_grads(::TwoNormals) = (true, false, false)
 get_static_argument_types(::TwoNormals) = (Float64, Float64, Float64)
 
 data = plate(two_normals)
 
 @compiled @gen function model(xs::Vector{Float64})
     n::Int = length(xs)
-    # inlier_std::Float64 = @addr(normal(0,2), :inlier_std)
-    # outlier_std::Float64 = @addr(normal(0,2), :outlier_std)
+    inlier_std::Float64 = @addr(normal(0,2), :inlier_std)
+    outlier_std::Float64 = @addr(normal(0,2), :outlier_std)
     slope::Float64 = @addr(normal(0,2), :slope)
     intercept::Float64 = @addr(normal(0,2), :intercept)
-
-    # inlier_std::Float64 = .5
-    # outlier_std::Float64 = .5
-    # slope::Float64 = -1
-    # intercept::Float64 = 2
-
     means::Vector{Float64} = broadcast(+, slope * xs, intercept)
     ys::PersistentVector{Float64} = @addr(
-        data(means, fill(.5, n), fill(5, n)),
+        data(means, fill(sqrt(exp(inlier_std)), n), fill(sqrt(exp(outlier_std)), n)),
         :data)
     return ys
 end
@@ -129,6 +123,16 @@ end
     for (i, y) in enumerate(ys)
         @addr(dirac(y), :data => i)
     end
+end
+
+@compiled @gen function inlier_std_proposal(prev)
+    inlier_std::Float64 = get_assignment(prev)[:inlier_std]
+    @addr(normal(inlier_std, .5), :inlier_std)
+end
+
+@compiled @gen function outlier_std_proposal(prev)
+    outlier_std::Float64 = get_assignment(prev)[:outlier_std]
+    @addr(normal(outlier_std, .5), :outlier_std)
 end
 
 Gen.load_generated_functions()
@@ -165,32 +169,28 @@ function do_inference(n)
         score,
         assignment[:slope],
         assignment[:intercept],
-        # assignment[:inlier_std],
-        # assignment[:outlier_std],
+        sqrt(exp(assignment[:inlier_std])),
+        sqrt(exp(assignment[:outlier_std])),
     ))
 
     for i=1:n
+        trace = map_optimize(model, slope_intercept_selection,
+            trace, max_step_size=1e-1, min_step_size=1e-10)
 
-        # step on the parameters
-        for j=1:5
-            trace = map_optimize(model, slope_intercept_selection,
-                trace, max_step_size=1e-1, min_step_size=1e-10)
-            # trace = map_optimize(model, std_selection,
-            #     trace, max_step_size=1e-1, min_step_size=1e-10)
+        trace = mh(model, inlier_std_proposal, (), trace)
+        trace = mh(model, outlier_std_proposal, (), trace)
 
-            # report loop stats
-            score = get_call_record(trace).score
-            assignment = get_assignment(trace)
-            println((
-                score,
-                assignment[:slope],
-                assignment[:intercept],
-                # assignment[:inlier_std],
-                # assignment[:outlier_std],
-            ))
-        end
-
+        # report loop stats
+        score = get_call_record(trace).score
+        assignment = get_assignment(trace)
+        println((
+            score,
+            assignment[:slope],
+            assignment[:intercept],
+            sqrt(exp(assignment[:inlier_std])),
+            sqrt(exp(assignment[:outlier_std])),
+        ))
     end
 end
 
-do_inference(100)
+do_inference(1000)
