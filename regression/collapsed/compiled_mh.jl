@@ -88,10 +88,8 @@ function do_inference(n)
 
     # prepare dataset
     xs, ys = generate_dataset()
-
-    # Cannot use `get_assignment` to make observations,
-    #   there is no error but the chain does not converge.
     observations = get_assignment(simulate(observer, (ys,)))
+    # Cannot use DynamicAssignment, does not converge.
     # observations = DynamicAssignment()
     # for (i, y) in enumerate(ys)
     #     observations[:data => i => :y] = y
