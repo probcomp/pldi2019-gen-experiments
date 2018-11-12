@@ -89,11 +89,6 @@ function do_inference(n)
     # prepare dataset
     xs, ys = generate_dataset()
     observations = get_assignment(simulate(observer, (ys,)))
-    # Cannot use DynamicAssignment, does not converge.
-    # observations = DynamicAssignment()
-    # for (i, y) in enumerate(ys)
-    #     observations[:data => i => :y] = y
-    # end
 
     # initial trace
     (trace, weight) = generate(model, (xs,), observations)
