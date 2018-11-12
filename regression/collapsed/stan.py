@@ -59,4 +59,4 @@ results = pd.DataFrame({
     'num_steps'       : num_iters_col,
     'prob_outlier'    : prob_outlier_col
 })
-results.to_csv('./tmp/stan.results.csv')
+results.to_csv('./stan.results.csv')
