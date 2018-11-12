@@ -1,6 +1,8 @@
 include("../shared.jl")
 
 import Random
+Random.seed!(432)
+
 import Distributions
 using FunctionalCollections
 
@@ -85,19 +87,38 @@ end
 
 has_output_grad(::TwoNormals) = true
 has_argument_grads(::TwoNormals) = (true, true, true)
-get_static_argument_types(::TwoNormals) = [Float64, Float64, Float64]
+get_static_argument_types(::TwoNormals) = (Float64, Float64, Float64)
 
 data = plate(two_normals)
 
 @compiled @gen function model(xs::Vector{Float64})
     n::Int = length(xs)
-    slope::Float64 = @addr(normal(0, 2), :slope)
-    intercept::Float64 = @addr(normal(0, 2), :intercept)
+    # inlier_std::Float64 = @addr(normal(0,2), :inlier_std)
+    # outlier_std::Float64 = @addr(normal(0,2), :outlier_std)
+    slope::Float64 = @addr(normal(0,2), :slope)
+    intercept::Float64 = @addr(normal(0,2), :intercept)
+
+    # inlier_std::Float64 = .5
+    # outlier_std::Float64 = .5
+    # slope::Float64 = -1
+    # intercept::Float64 = 2
+
     means::Vector{Float64} = broadcast(+, slope * xs, intercept)
     ys::PersistentVector{Float64} = @addr(
         data(means, fill(.5, n), fill(5, n)),
         :data)
     return ys
+end
+
+# Quick debugging function for computing the objective function.
+
+function compute_objective(xs::Vector{Float64}, ys::Vector{Float64},
+        sigma1::Float64, sigma2::Float64)
+    means = broadcast(+, -1 * xs, 2)
+    return sum([
+        logpdf(two_normals, y, mean, sigma1, sigma2)
+        for (y, mean) in zip(ys, means)
+    ])
 end
 
 #######################
@@ -123,8 +144,14 @@ slope_intercept_selection = let
     StaticAddressSet(s)
 end
 
-function do_inference(n)
+std_selection = let
+    s = DynamicAddressSet()
+    push!(s, :inlier_std)
+    push!(s, :outlier_std)
+    StaticAddressSet(s)
+end
 
+function do_inference(n)
     # prepare dataset
     xs, ys = generate_dataset()
     observations = get_assignment(simulate(observer, (ys,)))
@@ -132,23 +159,38 @@ function do_inference(n)
     # initial trace
     (trace, _) = generate(model, (xs,), observations)
 
+    score = get_call_record(trace).score
+    assignment = get_assignment(trace)
+    println((
+        score,
+        assignment[:slope],
+        assignment[:intercept],
+        # assignment[:inlier_std],
+        # assignment[:outlier_std],
+    ))
+
     for i=1:n
 
         # step on the parameters
         for j=1:5
             trace = map_optimize(model, slope_intercept_selection,
                 trace, max_step_size=1e-1, min_step_size=1e-10)
+            # trace = map_optimize(model, std_selection,
+            #     trace, max_step_size=1e-1, min_step_size=1e-10)
+
+            # report loop stats
+            score = get_call_record(trace).score
+            assignment = get_assignment(trace)
+            println((
+                score,
+                assignment[:slope],
+                assignment[:intercept],
+                # assignment[:inlier_std],
+                # assignment[:outlier_std],
+            ))
         end
 
-        # report loop stats
-        score = get_call_record(trace).score
-        assignment = get_assignment(trace)
-        println((score, assignment[:slope], assignment[:intercept],))
     end
-
-    assignment = get_assignment(trace)
-    score = get_call_record(trace).score
-    return (score, assignment[:slope], assignment[:intercept],)
 end
 
-do_inference(500)
+do_inference(100)
