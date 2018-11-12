@@ -155,7 +155,7 @@ std_selection = let
     StaticAddressSet(s)
 end
 
-function do_inference(n)
+function do_inference(method, n)
     # prepare dataset
     xs, ys = generate_dataset()
     observations = get_assignment(simulate(observer, (ys,)))
@@ -174,8 +174,14 @@ function do_inference(n)
     ))
 
     for i=1:n
-        trace = map_optimize(model, slope_intercept_selection,
-            trace, max_step_size=1e-1, min_step_size=1e-10)
+        if method == "mala"
+            trace = mala(model, slope_intercept_selection, trace, 0.0001)
+        elseif method == "map"
+            trace = map_optimize(model, slope_intercept_selection, trace,
+                min_step_size=1e-10, max_step_size=1e-1)
+        else
+            @assert false "Unknown method: $(method)"
+        end
 
         trace = mh(model, inlier_std_proposal, (), trace)
         trace = mh(model, outlier_std_proposal, (), trace)
@@ -193,4 +199,4 @@ function do_inference(n)
     end
 end
 
-do_inference(1000)
+do_inference("map", 1000)
