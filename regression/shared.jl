@@ -1,4 +1,6 @@
+using CSV
 using Random
+
 using Gen
 
 ############
@@ -16,6 +18,13 @@ end
 #####################
 # generate data set #
 #####################
+
+function load_dataset(path)
+    df = CSV.read(path)
+    xs::Vector{Float64} = df[:xs]
+    ys::Vector{Float64} = df[:ys]
+    return (xs, ys)
+end
 
 function generate_dataset(xmin::Float64=-5., xmax::Float64=5., N::Int=200)
     prob_outlier = 0.5

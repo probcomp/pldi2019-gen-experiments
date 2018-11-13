@@ -94,12 +94,10 @@ function do_inference(n)
 
         start = time()
         # steps on the parameters
-        for j=1:5
-            trace = mh(model, slope_proposal, (), trace)
-            trace = mh(model, intercept_proposal, (), trace)
-            trace = mh(model, inlier_std_proposal, (), trace)
-            trace = mh(model, outlier_std_proposal, (), trace)
-        end
+        trace = mh(model, slope_proposal, (), trace)
+        trace = mh(model, intercept_proposal, (), trace)
+        trace = mh(model, inlier_std_proposal, (), trace)
+        trace = mh(model, outlier_std_proposal, (), trace)
 
         # step on the outliers
         for j=1:length(xs)
