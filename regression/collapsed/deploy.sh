@@ -1,1 +1,1 @@
-../uncollapsed/deploy.sh
+../deploy.sh

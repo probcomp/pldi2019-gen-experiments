@@ -1,1 +1,1 @@
-../uncollapsed/summarize.sh
+../summarize.sh
