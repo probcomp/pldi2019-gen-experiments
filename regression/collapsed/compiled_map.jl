@@ -173,7 +173,9 @@ function do_inference(method, n)
         sqrt(exp(assignment[:outlier_std])),
     ))
 
+    runtime = 0
     for i=1:n
+        start = time()
         if method == "mala"
             trace = mala(model, slope_intercept_selection, trace, 0.0001)
         elseif method == "map"
@@ -186,6 +188,9 @@ function do_inference(method, n)
         trace = mh(model, inlier_std_proposal, (), trace)
         trace = mh(model, outlier_std_proposal, (), trace)
 
+        elapsed = time() - start
+        runtime += elapsed
+
         # report loop stats
         score = get_call_record(trace).score
         assignment = get_assignment(trace)
@@ -197,6 +202,27 @@ function do_inference(method, n)
             sqrt(exp(assignment[:outlier_std])),
         ))
     end
+
+    return (
+        n,
+        runtime,
+        score,
+        assignment[:slope],
+        assignment[:intercept],
+        assignment[:inlier_std],
+        assignment[:outlier_std],
+        )
 end
 
-do_inference("map", 1000)
+#################
+# run inference #
+#################
+
+method = "map"
+do_inference(method, 10)
+
+results = do_inference(method, 500)
+fname = "compiled_$(method).results.csv"
+open(fname, "a") do f
+    write(f, join(results, ',') * '\n')
+end

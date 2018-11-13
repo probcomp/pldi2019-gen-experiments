@@ -32,7 +32,8 @@ outlier_log_var_col = []
 elapsed_col = []
 prob_outlier_col = []
 
-steps = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+# steps = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+steps=[100]
 for num_iters in steps:
     print 'num_iters: %s' % (num_iters,)
     for rep in range(num_reps):
@@ -46,7 +47,7 @@ for num_iters in steps:
         intercept_col.append(df['intercept'][num_rows-1])
         inlier_log_var_col.append(df['inlier_log_var'][num_rows-1])
         outlier_log_var_col.append(df['outlier_log_var'][num_rows-1])
-        elapsed_col.append(elapsed * 1000)
+        elapsed_col.append(elapsed)
         prob_outlier_col.append(prob_outlier)
         num_iters_col.append(num_iters)
 

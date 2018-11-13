@@ -93,8 +93,9 @@ function do_inference(n)
     # initial trace
     (trace, weight) = generate(model, (xs,), observations)
 
+    runtime = 0
     for i=1:n
-
+        start = time()
         # steps on the parameters
         for j=1:5
             trace = mh(model, slope_proposal, (), trace)
@@ -102,6 +103,9 @@ function do_inference(n)
             trace = mh(model, inlier_std_proposal, (), trace)
             trace = mh(model, outlier_std_proposal, (), trace)
         end
+        elapsed = time() - start
+        runtime += elapsed
+
 		assignment = get_assignment(trace)
         score = get_call_record(trace).score
 		println((score, assignment[:inlier_std], assignment[:outlier_std],
@@ -110,20 +114,25 @@ function do_inference(n)
 
 	assignment = get_assignment(trace)
     score = get_call_record(trace).score
-    return (score, assignment[:inlier_std], assignment[:outlier_std],
-        assignment[:slope], assignment[:intercept])
+    return (
+        n,
+        runtime,
+        score,
+        assignment[:slope],
+        assignment[:intercept],
+        assignment[:inlier_std],
+        assignment[:outlier_std],
+        )
 end
 
 #################
 # run inference #
 #################
 
-using Test
+do_inference(10)
 
-(score, inlier_std, outlier_std, slope, intercept) = do_inference(500)
-max_std = max(inlier_std, outlier_std)
-min_std = min(inlier_std, outlier_std)
-@test isapprox(min_std, 0.5, atol=1e-1)
-@test isapprox(max_std, 5.0, atol=1e-0)
-@test isapprox(slope, -1, atol=1e-1)
-@test isapprox(intercept, 2, atol=2e-1)
+results = do_inference(200)
+fname = "compiled_mh.results.csv"
+open(fname, "a") do f
+    write(f, join(results, ',') * '\n')
+end
