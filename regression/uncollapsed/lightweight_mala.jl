@@ -72,8 +72,9 @@ function do_inference(method, n)
     # initial trace
     (trace, _) = generate(model, (xs,), observations)
 
+    runtime = 0
     for i=1:n
-
+        start  = time()
         # step on the numeric parameters.
         if method == "mala"
             trace = mala(model, selection, trace, 0.0001)
@@ -87,6 +88,8 @@ function do_inference(method, n)
         for j=1:length(xs)
             trace = mh(model, is_outlier_proposal, (j,), trace)
         end
+        elapsed = time() - start
+        runtime += elapsed
 
         score = get_call_record(trace).score
         assignment = get_assignment(trace)
@@ -98,6 +101,23 @@ function do_inference(method, n)
             ("outlier_std", sqrt(exp(assignment[:outlier_std]))),
         ))
     end
+    assignment = get_assignment(trace)
+    score = get_call_record(trace).score
+    return (
+        n,
+        runtime,
+        score,
+        assignment[:slope],
+        assignment[:intercept],
+        assignment[:inlier_std],
+        assignment[:outlier_std]
+    )
 end
 
-do_inference("mala", 1000)
+do_inference("mala", 10)
+
+results = do_inference("mala", 1000)
+fname = "lightweight_mala.results.csv"
+open(fname, "a") do f
+    write(f, join(results, ',') * '\n')
+end

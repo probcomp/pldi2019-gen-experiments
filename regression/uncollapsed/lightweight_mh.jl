@@ -98,8 +98,10 @@ function do_inference(n)
     # initial trace
     (trace, _) = generate(model, (xs,), observations)
 
+    runtime = 0
     for i=1:n
 
+        start = time()
         # steps on the parameters
         for j=1:5
             trace = mh(model, slope_proposal, (), trace)
@@ -112,6 +114,8 @@ function do_inference(n)
         for j=1:length(xs)
             trace = mh(model, is_outlier_proposal, (j,), trace)
         end
+        elapsed = time() - start
+        runtime += elapsed
 
         # report loop stats
         assignment = get_assignment(trace)
@@ -122,21 +126,24 @@ function do_inference(n)
 
     assignment = get_assignment(trace)
     score = get_call_record(trace).score
-    return (score, assignment[:inlier_std], assignment[:outlier_std],
-        assignment[:slope], assignment[:intercept])
+    return (
+        n,
+        runtime,
+        score,
+        assignment[:slope],
+        assignment[:intercept],
+        assignment[:inlier_std],
+        assignment[:outlier_std])
 end
 
 #################
 # run inference #
 #################
 
-(score, inlier_std, outlier_std, slope, intercept) = do_inference(500)
+do_inference(10)
 
-using Test
-max_std = max(inlier_std, outlier_std)
-min_std = min(inlier_std, outlier_std)
-# @test isapprox(min_std, 0.5, atol=1e-1)
-# @test isapprox(max_std, 5.0, atol=1e-0)
-# @test isapprox(slope, -1, atol=1e-1)
-# @test isapprox(intercept, 2, atol=2e-1)
-
+results = do_inference(200)
+fname = "lightweight_mh.results.csv"
+open(fname, "a") do f
+    write(f, join(results, ',') * '\n')
+end

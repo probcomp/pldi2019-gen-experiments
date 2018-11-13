@@ -78,8 +78,10 @@ function do_inference(n)
     # initial trace
     (trace, _) = generate(model, (xs,), observations)
 
+    runtime = 0
     for i=1:n
         # step on the parameters
+        start = time()
         for j=1:5
             trace = map_optimize(model, slope_intercept_selection,
                 trace, max_step_size=0.1, min_step_size=1e-5)
@@ -91,6 +93,8 @@ function do_inference(n)
         for j=1:length(xs)
             trace = mh(model, is_outlier_proposal, (j,), trace)
         end
+        elapsed = time() - start
+        runtime += elapsed
 
         # report loop stats
         score = get_call_record(trace).score
@@ -104,12 +108,21 @@ function do_inference(n)
 
     assignment = get_assignment(trace)
     score = get_call_record(trace).score
-    return (score,
+    return (
+        n,
+        runtime,
+        score,
         assignment[:slope],
         assignment[:intercept],
-        sqrt(exp(assignment[:inlier_std])),
-        sqrt(exp(assignment[:outlier_std])))
-
+        assignment[:inlier_std],
+        assignment[:outlier_std],
+    )
 end
 
-(score, inlier_std, outlier_std, slope, intercept) = do_inference(500)
+do_inference(10)
+
+results = do_inference(200)
+fname = "lightweight_map.results.csv"
+open(fname, "a") do f
+    write(f, join(results, ',') * '\n')
+end

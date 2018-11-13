@@ -121,7 +121,10 @@ function do_inference(n)
 
     scores = Vector{Float64}(undef, n)
 
+    runtime = 0
     for i=1:n
+
+        start = time()
         for j=1:5
             trace = map_optimize(model, slope_intercept_selection, trace,
                 max_step_size=0.1, min_step_size=1e-10)
@@ -133,6 +136,8 @@ function do_inference(n)
         for j=1:length(xs)
             trace = mh(model, is_outlier_proposal, (j,), trace)
         end
+        elapsed = time() - start
+        runtime += elapsed
 
         # report loop stats
         score = get_call_record(trace).score
@@ -143,7 +148,27 @@ function do_inference(n)
             sqrt(exp(assignment[:inlier_std])),
             sqrt(exp(assignment[:outlier_std]))))
     end
-    return scores
+
+    score = get_call_record(trace).score
+    assignment = get_assignment(trace)
+    return (
+        n,
+        runtime,
+        score,
+        assignment[:slope],
+        assignment[:intercept],
+        assignment[:inlier_std],
+        assignment[:outlier_std])
 end
 
-scores = do_inference(500)
+#################
+# run inference #
+#################
+
+do_inference(10)
+
+results = do_inference(200)
+fname = "compiled_map.results.csv"
+open(fname, "a") do f
+    write(f, join(results, ',') * '\n')
+end
