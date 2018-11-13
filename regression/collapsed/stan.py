@@ -4,6 +4,8 @@ import time
 
 import pandas as pd
 
+from collections import OrderedDict
+
 os.system('mkdir -p ./tmp')
 
 # Uncomment this code to recompile the Stan model and save it to disk.
@@ -51,13 +53,13 @@ for num_iters in steps:
         prob_outlier_col.append(prob_outlier)
         num_iters_col.append(num_iters)
 
-results = pd.DataFrame({
-    'slope'           : slope_col,
-    'intercept'       : intercept_col,
-    'inlier_log_var'  : inlier_log_var_col,
-    'outlier_log_var' : outlier_log_var_col,
-    'elapsed'         : elapsed_col,
-    'num_steps'       : num_iters_col,
-    'prob_outlier'    : prob_outlier_col
-})
-results.to_csv('./stan.results.csv')
+results = pd.DataFrame(OrderedDict([
+    ('num_steps'       , num_iters_col),
+    ('elapsed'         , elapsed_col),
+    ('score'           , [0]*len(elapsed_col)),
+    ('slope'           , slope_col),
+    ('intercept'       , intercept_col),
+    ('inlier_log_var'  , inlier_log_var_col),
+    ('outlier_log_var' , outlier_log_var_col),
+]))
+results.to_csv('./stan.results.csv', index=False, header=False)
