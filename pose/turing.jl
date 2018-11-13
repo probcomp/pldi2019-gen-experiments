@@ -236,3 +236,19 @@ for i=1:4
     FileIO.save("wireframe-$i.png", map(ImageCore.clamp01, wireframe))
     println("elapsed (sec.): $elapsed")
 end
+
+# results:
+#i: 1
+#picked idx: 666
+#elapsed (sec.): 98.89742918100092
+#i: 2
+#picked idx: 386
+#elapsed (sec.): 89.83002206901438
+#i: 3
+#picked idx: 46
+#elapsed (sec.): 91.25445953200688
+#i: 4
+#picked idx: 250
+#elapsed (sec.): 88.41515733400593
+
+# median elapsed: 90.54224080051063
