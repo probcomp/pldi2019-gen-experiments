@@ -6,4 +6,4 @@ fname=${1}
 iters=$(cat ${fname}| head -n1 | cut -d, -f1)
 median=$(datamash -t, median 2 < ${fname})
 iqr=$(datamash -t, iqr 2 < ${fname})
-echo $(python -c "print ${median}/${iters}, ${iqr}/${iters}")
+echo $(python -c "print 1000*${median}/${iters}, 1000*${iqr}/${iters}")
