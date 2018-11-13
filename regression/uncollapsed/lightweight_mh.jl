@@ -29,7 +29,7 @@ data = plate(datum)
             end
         end
     end
-    ys = @addr(data(xs, fill(params, length(xs))), :data)
+    ys = @addr(data(xs, fill(params, length(xs))), :data, argdiff)
     return ys
 end
 
@@ -73,14 +73,6 @@ end
     @addr(bernoulli(prev ? 0.0 : 1.0), :data => i => :z)
 end
 
-@gen function observer(ys::Vector{Float64})
-    for (i, y) in enumerate(ys)
-        @addr(dirac(y), :data => i => :y)
-    end
-end
-
-Gen.load_generated_functions()
-
 ##################
 # run experiment #
 ##################
@@ -89,7 +81,6 @@ function do_inference(n)
 
     # prepare dataset
     xs, ys = generate_dataset()
-    # observations = get_assignment(simulate(observer, (ys,)))
     observations = DynamicAssignment()
     for (i, y) in enumerate(ys)
         observations[:data => i => :y] = y
