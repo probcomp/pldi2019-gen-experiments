@@ -7,7 +7,7 @@ include("../shared.jl")
 @gen function datum(x::Float64, params::Params)
     is_outlier = @addr(bernoulli(params.prob_outlier), :z)
     std = is_outlier ? params.inlier_std : params.outlier_std
-    y = @addr(normal(x * params.slope + params.intercept, std), :y)
+    y = @addr(normal(x * params.slope + params.intercept, sqrt(exp(std))), :y)
     return y
 end
 
@@ -16,8 +16,8 @@ end
 data = plate(datum)
 
 @gen function model(xs::Vector{Float64})
-    inlier_std = @addr(Gen.gamma(1, 1), :inlier_std)
-    outlier_std = @addr(Gen.gamma(1, 1), :outlier_std)
+    inlier_std = @addr(normal(0, 2), :inlier_std)
+    outlier_std = @addr(normal(0, 2), :outlier_std)
     slope = @addr(normal(0, 2), :slope)
     intercept = @addr(normal(0, 2), :intercept)
     params = Params(0.5, inlier_std, outlier_std, slope, intercept)
@@ -111,8 +111,13 @@ function do_inference(n)
         # report loop stats
         assignment = get_assignment(trace)
         score = get_call_record(trace).score
-        println((score, assignment[:inlier_std], assignment[:outlier_std],
-            assignment[:slope], assignment[:intercept]))
+        println((
+            score,
+            assignment[:slope],
+            assignment[:intercept],
+            sqrt(exp(assignment[:inlier_std])),
+            sqrt(exp(assignment[:outlier_std]))),
+        )
     end
 
     assignment = get_assignment(trace)
