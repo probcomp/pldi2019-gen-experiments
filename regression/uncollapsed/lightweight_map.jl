@@ -72,7 +72,7 @@ push!(std_selection, :outlier_std)
 function do_inference(n)
 
     # prepare dataset
-    xs, ys = generate_dataset()
+    xs, ys = load_dataset("../train.csv")
     observations = get_assignment(simulate(observer, (ys,)))
 
     # initial trace

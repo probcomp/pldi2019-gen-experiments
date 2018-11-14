@@ -117,7 +117,7 @@ Gen.load_generated_functions()
 
 
 function do_inference(n)
-    (xs, ys) = generate_dataset()
+    (xs, ys) = load_dataset("../train.csv")
     observations = DynamicAssignment()
     for (i, y) in enumerate(ys)
         observations[:data => i => :y] = y
