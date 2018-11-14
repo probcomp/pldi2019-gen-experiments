@@ -61,13 +61,11 @@ Gen.load_generated_functions()
 # run experiment #
 ##################
 
-slope_intercept_selection = DynamicAddressSet()
-push!(slope_intercept_selection, :slope)
-push!(slope_intercept_selection, :intercept)
-
-std_selection = DynamicAddressSet()
-push!(std_selection, :inlier_std)
-push!(std_selection, :outlier_std)
+selection = DynamicAddressSet()
+push!(selection, :slope)
+push!(selection, :intercept)
+push!(selection, :inlier_std)
+push!(selection, :outlier_std)
 
 function do_inference(n)
 
@@ -80,13 +78,15 @@ function do_inference(n)
 
     runtime = 0
     for i=1:n
-        # step on the parameters
+
         start = time()
-        for j=1:5
-            trace = map_optimize(model, slope_intercept_selection,
-                trace, max_step_size=0.1, min_step_size=1e-5)
-            trace = map_optimize(model, std_selection,
-                trace, max_step_size=0.1, min_step_size=1e-10)
+
+        # XXX To get this to work:
+        # 1. Use adaptive gradients 1e-1 to 1e-10
+        # 2. Make selection for slope/intercept and inlier_std/outlier_std.
+        for j=1:10
+            trace = map_optimize(model, selection,
+                trace, max_step_size=1e-6, min_step_size=1e-6)
         end
 
         # step on the outliers
@@ -99,7 +99,7 @@ function do_inference(n)
         # report loop stats
         score = get_call_record(trace).score
         assignment = get_assignment(trace)
-        println((score,
+        println((i, score,
             assignment[:slope],
             assignment[:intercept],
             sqrt(exp(assignment[:inlier_std])),
@@ -121,7 +121,7 @@ end
 
 do_inference(10)
 
-results = do_inference(200)
+results = do_inference(100)
 fname = "lightweight_map.results.csv"
 open(fname, "a") do f
     write(f, join(results, ',') * '\n')

@@ -95,15 +95,10 @@ Gen.load_generated_functions()
 # run experiment #
 ##################
 
-slope_intercept_selection = let
+selection = let
     s = DynamicAddressSet()
     push!(s, :slope)
     push!(s, :intercept)
-    StaticAddressSet(s)
-end
-
-std_selection = let
-    s = DynamicAddressSet()
     push!(s, :inlier_std)
     push!(s, :outlier_std)
     StaticAddressSet(s)
@@ -125,11 +120,13 @@ function do_inference(n)
     for i=1:n
 
         start = time()
-        for j=1:5
-            trace = map_optimize(model, slope_intercept_selection, trace,
-                max_step_size=0.1, min_step_size=1e-10)
-            trace = map_optimize(model, std_selection, trace,
-                max_step_size=0.1, min_step_size=1e-10)
+
+        # XXX To get this to work:
+        # 1. Use adaptive gradients 1e-1 to 1e-10
+        # 2. Make selection for slope/intercept and inlier_std/outlier_std.
+        for j=1:10
+            trace = map_optimize(model, selection, trace,
+                max_step_size=1e-6, min_step_size=1e-6)
         end
 
         # step on the outliers
