@@ -84,10 +84,9 @@ function do_inference(n)
         # XXX To get this to work:
         # 1. Use adaptive gradients 1e-1 to 1e-10
         # 2. Make selection for slope/intercept and inlier_std/outlier_std.
-        for j=1:10
-            trace = map_optimize(model, selection,
-                trace, max_step_size=1e-6, min_step_size=1e-6)
-        end
+        # 3. Make 10 steps instead of 1 step.
+        trace = map_optimize(model, selection,
+            trace, max_step_size=1e-6, min_step_size=1e-6)
 
         # step on the outliers
         for j=1:length(xs)
