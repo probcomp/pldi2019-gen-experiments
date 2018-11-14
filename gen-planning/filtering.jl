@@ -641,35 +641,37 @@ function experiment()
     median_elapsed = [median(results_lightweight[num_particles][2]) for num_particles in num_particles_list]
     mean_lmls = [mean(results_lightweight[num_particles][1]) for num_particles in num_particles_list]
     println("lightweight (default)")
-    # print times for 100 particles
-    println(results_lightweight[100][2])
-    # print medians for all particles
-    println(median_elapsed)
-    println(mean_lmls)
+    println(results_lightweight)
+#    println(results_lightweight[100][2])
+#    println(median_elapsed)
+#    println(mean_lmls)
     plot(median_elapsed, mean_lmls, label="lightweight (default)", color="blue")
 
     median_elapsed = [median(results_compiled[num_particles][2]) for num_particles in num_particles_list]
     mean_lmls = [mean(results_compiled[num_particles][1]) for num_particles in num_particles_list]
     println("compiled (default)")
-    println(results_compiled[100][2])    
-    println(median_elapsed)
-    println(mean_lmls)
+    println(results_compiled)
+    # println(results_compiled[100][2])    
+    # println(median_elapsed)
+    # println(mean_lmls)
     plot(median_elapsed, mean_lmls, label="compiled (default)", color="red")
 
     median_elapsed = [median(results_lightweight_external[num_particles][2]) for num_particles in num_particles_list]
     mean_lmls = [mean(results_lightweight_external[num_particles][1]) for num_particles in num_particles_list]
     println("lightweight (custom)")
-    println(results_lightweight_external[100][2])
-    println(median_elapsed)
-    println(mean_lmls)
+    println(results_lightweight_external)
+    # println(results_lightweight_external[100][2])
+    # println(median_elapsed)
+    # println(mean_lmls)
     plot(median_elapsed, mean_lmls, label="lightweight (custom)", color="cyan")
 
     median_elapsed = [median(results_compiled_external[num_particles][2]) for num_particles in num_particles_list]
     mean_lmls = [mean(results_compiled_external[num_particles][1]) for num_particles in num_particles_list]
     println("compiled (custom)")
-    println(results_compiled_external[100][2])
-    println(median_elapsed)
-    println(mean_lmls)
+    println(results_compiled_external)
+    # println(results_compiled_external[100][2])
+    # println(median_elapsed)
+    # println(mean_lmls)
     plot(median_elapsed, mean_lmls, label="compiled (custom)", color="orange")
 
 
