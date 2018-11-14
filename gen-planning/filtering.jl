@@ -7,9 +7,7 @@ using Statistics: median, mean
 
 include("scenes.jl")
 include("path_planner.jl")
-
-# depends on: scenes.jl, path_planner.jl
-
+include("piecewise_normal.jl")
 
 #####################################
 # lightweight implementation of hmm #
@@ -39,101 +37,10 @@ include("path_planner.jl")
     return locations
 end
 
-#################################
-# piecewise normal distribution #
-#################################
 
-struct PieceWiseNormal <: Gen.Distribution{Float64} end
-const piecewise_normal = PieceWiseNormal()
-
-# piece 1 has interval (-Inf, boundaries[1])
-# piece 2 has interval (boundaries[1], boundaries[2])
-# ..
-# piece n has interval (boundaries[n-1], boundaries[n])
-# piece n+1 has interval (boundaries[n], Inf)
-
-function Gen.random(::PieceWiseNormal, probabilities::Vector{Float64}, mus::Vector{Float64}, stds::Vector{Float64}, boundaries::Vector{Float64})
-    n_segments = length(probabilities)
-    @assert n_segments == length(mus)
-    @assert n_segments == length(stds)
-    @assert n_segments == length(boundaries)+1
-    idx = categorical(probabilities)
-    dist = Distributions.TruncatedNormal(mus[idx], stds[idx], idx == 1 ? -Inf : boundaries[idx-1], idx == n_segments ? Inf : boundaries[idx])
-    rand(dist)
-end
-
-function Gen.logpdf(::PieceWiseNormal, x::Float64, probabilities::Vector{Float64}, mus::Vector{Float64}, stds::Vector{Float64}, boundaries::Vector{Float64})
-    n_segments = length(probabilities)
-    @assert n_segments == length(mus)
-    @assert n_segments == length(stds)
-    @assert n_segments == length(boundaries)+1
-    log_probs = Vector{Float64}(undef, n_segments)
-    for idx=1:length(probabilities)
-        dist = Distributions.TruncatedNormal(mus[idx], stds[idx], idx == 1 ? -Inf : boundaries[idx-1], idx == n_segments ? Inf : boundaries[idx])
-        log_probs[idx] = log(probabilities[idx]) + Distributions.logpdf(dist, x)
-    end
-    logsumexp(log_probs)
-end
-
-
-
-#######################################
-# custom proposal for lightweight hmm #
-#######################################
-
-@gen function lightweight_fancy_step_proposal(step::Int, prev_dist::Float64, noise :: Float64, obs :: Point,
-                                        posterior_var_d :: Float64, posterior_covars :: Vector{Matrix{Float64}},
-                                        path :: Path, distances_from_start :: Vector{Float64},
-                                        speed::Float64, times::Vector{Float64}, dist_slack::Float64)
-    N = length(path.points)
-
-    # Initialize parameters for truncated normal
-    unnormalized_log_segment_probs = Vector{Float64}(undef, N+1)
-    mus  = Vector{Float64}(undef, N+1)
-    stds = Vector{Float64}(undef, N+1)
-
-    dt = step == 1 ? times[step] : times[step] - times[step-1]
-
-    # First segment
-    mus[1] = prev_dist + dt * speed
-    stds[1] = dist_slack
-    unnormalized_log_segment_probs[1] = Distributions.logcdf(Distributions.Normal(mus[1], stds[1]), 0) + Distributions.logpdf(Distributions.Normal(path.start.x, noise), obs.x) + Distributions.logpdf(Distributions.Normal(path.start.y, noise), obs.y)
-   
-    # Last segment
-    mus[N+1] = prev_dist + dt * speed
-    stds[N+1] = dist_slack
-    unnormalized_log_segment_probs[N+1] = Distributions.logccdf(Distributions.Normal(mus[N+1], stds[N+1]), distances_from_start[end]) +  Distributions.logpdf(Distributions.Normal(path.goal.x, noise), obs.x) + Distributions.logpdf(Distributions.Normal(path.goal.y, noise), obs.y)
-
-    # Middle segments
-    for i=2:N
-        dx = path.points[i].x - path.points[i-1].x 
-        dy = path.points[i].y - path.points[i-1].y
-        dd = distances_from_start[i] - distances_from_start[i-1]
-
-        prior_mu_d = mus[1] - distances_from_start[i-1]
-        x_obs = obs.x - path.points[i-1].x 
-        y_obs = obs.y - path.points[i-1].y
-
-        posterior_mu_d = posterior_var_d * ((dx * x_obs + dy * y_obs) / (dd * noise^2) + prior_mu_d / dist_slack^2)
-
-        mu_xy = prior_mu_d/dd .* [dx, dy]
-
-        mus[i] = posterior_mu_d + distances_from_start[i-1]
-        stds[i] = sqrt(posterior_var_d)
-        unnormalized_log_segment_probs[i] = Distributions.logpdf(Distributions.MvNormal(mu_xy, posterior_covars[i]), [x_obs, y_obs]) + log(Distributions.cdf(Distributions.Normal(posterior_mu_d, stds[i]), dd) - Distributions.cdf(Distributions.Normal(posterior_mu_d, stds[i]), 0))
-    end
-
-    # Now do a log categorical draw,
-    # and within that, do a truncated normal sample.
-    log_total_weight = logsumexp(unnormalized_log_segment_probs)
-    log_normalized_weights = unnormalized_log_segment_probs .- log_total_weight
-    probabilities = exp.(log_normalized_weights)
-    @addr(piecewise_normal(probabilities, mus, stds, distances_from_start), (:dist, step))
-end
-
-##################################
-# compiled implementation of hmm #
-##################################
+################################################################
+# lightweight and compiled implementations of hmm, with unfold #
+################################################################
 
 struct KernelState
     dist::Float64
@@ -157,7 +64,42 @@ function dist_mean(prev_state::KernelState, params::KernelParams, t::Int)
     end
 end
 
-@compiled @gen function kernel(t::Int, prev_state::KernelState, params::KernelParams)
+@gen function lightweight_hmm_markov(step::Int, path::Path, distances_from_start::Vector{Float64},
+                                     times::Vector{Float64}, speed::Float64,
+                                     noise::Float64, dist_slack::Float64)
+    @assert step >= 1
+
+    # walk path
+    locations = Vector{Point}(undef, step)
+    dist = @addr(normal(speed * times[1], dist_slack), (:dist, 1))
+    locations[1] = walk_path(path, distances_from_start, dist)
+    for t=2:step
+        dist = @addr(normal(dist + speed * (times[t] - times[t-1]), dist_slack), (:dist, t))
+        locations[t] = walk_path(path, distances_from_start, dist)
+    end
+
+    # generate noisy observations
+    for t=1:step
+        point = locations[t]
+        @addr(normal(point.x, noise), (:x, t))
+        @addr(normal(point.y, noise), (:y, t))
+    end
+
+    return locations
+end
+
+@gen function lightweight_hmm_kernel(t::Int, prev_state::KernelState, params::KernelParams)
+    # NOTE: if t = 1 then prev_state will have all NaNs
+    dist = @addr(normal(dist_mean(prev_state, params, t), params.dist_slack), :dist)
+    loc = walk_path(params.path, params.distances_from_start, dist)
+    @addr(normal(loc.x, params.noise), :x)
+    @addr(normal(loc.y, params.noise), :y)
+    return KernelState(dist, loc)
+end
+
+lightweight_hmm_with_markov = markov(lightweight_hmm_kernel)
+
+@compiled @gen function compiled_hmm_kernel(t::Int, prev_state::KernelState, params::KernelParams)
     # NOTE: if t = 1 then prev_state will have all NaNs
     dist::Float64 = @addr(normal(dist_mean(prev_state, params, t), params.dist_slack), :dist)
     loc::Point = walk_path(params.path, params.distances_from_start, dist)
@@ -168,18 +110,18 @@ end
 
 # construct a hidden markov model generator
 # args: (num_steps::Int, init_state::KernelState, params::KernelParams)
-compiled_hmm = markov(kernel)
+compiled_hmm = markov(compiled_hmm_kernel)
 
 
-#############################
-# proposal for compiled hmm #
-#############################
+####################
+# custom proposals #
+####################
 
-@gen function compiled_fancy_proposal_inner(dt::Float64, prev_dist::Float64, noise :: Float64, obs :: Point,
-                                        posterior_var_d :: Float64, posterior_covars :: Vector{Matrix{Float64}},
-                                        path :: Path, distances_from_start :: Vector{Float64},
+function compute_custom_proposal_params(dt::Float64, prev_dist::Float64, noise::Float64, obs::Point,
+                                        posterior_var_d::Float64, posterior_covars::Vector{Matrix{Float64}},
+                                        path::Path, distances_from_start::Vector{Float64},
                                         speed::Float64, dist_slack::Float64)
-
+    
     N = length(path.points)
 
     # Initialize parameters for truncated normal
@@ -216,15 +158,41 @@ compiled_hmm = markov(kernel)
         unnormalized_log_segment_probs[i] = Distributions.logpdf(Distributions.MvNormal(mu_xy, posterior_covars[i]), [x_obs, y_obs]) + log(Distributions.cdf(Distributions.Normal(posterior_mu_d, stds[i]), dd) - Distributions.cdf(Distributions.Normal(posterior_mu_d, stds[i]), 0))
     end
 
-    # Now do a log categorical draw,
-    # and within that, do a truncated normal sample.
+    # You can think of the piecewise truncated normal as doing (1) categorical
+    # draw, and (2) within that, a truncated normal draw.
     log_total_weight = logsumexp(unnormalized_log_segment_probs)
     log_normalized_weights = unnormalized_log_segment_probs .- log_total_weight
     probabilities = exp.(log_normalized_weights)
+
+    return (probabilities, mus, stds, distances_from_start)
+end
+
+@gen function lightweight_fancy_step_proposal(step::Int, prev_dist::Float64, noise :: Float64, obs :: Point,
+                                        posterior_var_d :: Float64, posterior_covars :: Vector{Matrix{Float64}},
+                                        path :: Path, distances_from_start :: Vector{Float64},
+                                        speed::Float64, times::Vector{Float64}, dist_slack::Float64)
+
+    dt = step == 1 ? times[step] : times[step] - times[step-1]
+    (probabilities, mus, stds, distances_from_start) = compute_custom_proposal_params(dt, prev_dist, noise, obs,
+                                                            posterior_var_d, posterior_covars, path, distances_from_start,
+                                                            speed, dist_slack)
+
+    @addr(piecewise_normal(probabilities, mus, stds, distances_from_start), (:dist, step))
+end
+
+@gen function markov_fancy_proposal_inner(dt::Float64, prev_dist::Float64, noise :: Float64, obs :: Point,
+                                        posterior_var_d :: Float64, posterior_covars :: Vector{Matrix{Float64}},
+                                        path :: Path, distances_from_start :: Vector{Float64},
+                                        speed::Float64, dist_slack::Float64)
+
+    (probabilities, mus, stds, distances_from_start) = compute_custom_proposal_params(dt, prev_dist, noise, obs,
+                                                            posterior_var_d, posterior_covars, path, distances_from_start,
+                                                            speed, dist_slack)
+
     @addr(piecewise_normal(probabilities, mus, stds, distances_from_start), :dist)
 end
 
-compiled_fancy_proposal = at_dynamic(compiled_fancy_proposal_inner, Int)
+compiled_fancy_proposal = at_dynamic(markov_fancy_proposal_inner, Int)
 
 
 #############################
@@ -424,39 +392,32 @@ end
 # particle filtering experiments #
 ##################################
 
-function experiment()
+struct Params
+    times::Vector{Float64}
+    speed::Float64
+    dist_slack::Float64
+    noise::Float64
+    path::Path
+end
 
-    Random.seed!(0)
+struct PrecomputedPathData
+    posterior_var_d::Float64
+    posterior_covars::Vector{Matrix{Float64}}
+    distances_from_start::Vector{Float64}
+end
 
-    # generate a path and precompute distances from the start
-    maybe_path = plan_path(start, stop, scene, PlannerParams(300, 3.0, 2000, 1.))
-    @assert !isnull(maybe_path)
-    path = get(maybe_path)
+function PrecomputedPathData(params::Params)
+    times = params.times
+    speed = params.speed
+    dist_slack = params.dist_slack
+    noise = params.noise
+    path = params.path
+
     distances_from_start = compute_distances_from_start(path)
 
-    # generate ground truth locations and observations
-    model_args = (length(times), path, distances_from_start, times, speed, noise, dist_slack)
-    trace = simulate(lightweight_hmm, model_args)
-    assignment = get_assignment(trace)
-    measured_xs = [assignment[(:x, i)] for i=1:length(times)]
-    measured_ys = [assignment[(:y, i)] for i=1:length(times)]
-    actual_dists = [assignment[(:dist, i)] for i=1:length(times)]
-
-    num_particles_list = [1, 3, 7, 10, 30, 100, 300, 1000]
-    num_reps = 10
-    max_steps = length(times)
-    verbose = false
-
-
-    ## particle filtering in compiled hmm using extenral proposal ##
-
-    println("compiled hmm (external proposal)..")
-
-    # These are computed in a strange place, but are the same for every
-    # step, so I put the code here. posterior_var_d is the variance
-    # of the posterior on d' given x and y. posterior_covars is a vector 
-    # of 2x2 covariance matrices, representing the covariance of x and y
-    # when d' has been marginalized out.
+    # posterior_var_d is the variance of the posterior on d' given x and y.
+    # posterior_covars is a vector of 2x2 covariance matrices, representing the
+    # covariance of x and y when d' has been marginalized out.
     posterior_var_d = dist_slack^2 * noise^2 / (dist_slack^2 + noise^2)
     posterior_covars = Vector{Matrix{Float64}}(undef, length(distances_from_start))
     for i = 2:length(distances_from_start)
@@ -465,6 +426,22 @@ function experiment()
         dy = path.points[i].y - path.points[i-1].y
         posterior_covars[i] = [noise 0; 0 noise] .+ (dist_slack^2/dd^2 .* [dx^2 dx*dy; dy*dx dy^2])
     end
+
+    PrecomputedPathData(posterior_var_d, posterior_covars, distances_from_start)
+end
+
+### (1) compiled, with markov, default proposal ###
+
+function particle_filtering_compiled_hmm_default_proposal(params::Params,
+        measured_xs::Vector{Float64}, measured_ys::Vector{Float64},
+        num_particles_list::Vector{Int}, num_reps::Int)
+
+    precomputed = PrecomputedPathData(params)
+    times = params.times
+    speed = params.speed
+    dist_slack = params.dist_slack
+    noise = params.noise
+    path = params.path
 
     function get_compiled_hmm_init()
         observations = DynamicAssignment()
@@ -484,12 +461,59 @@ function experiment()
         return (observations, proposal_args)
     end
 
+    function get_compiled_hmm_obs(step::Int)
+        assignment = DynamicAssignment()
+        assignment[step => :x] = measured_xs[step]
+        assignment[step => :y] = measured_ys[step]
+        return assignment
+    end
+
+    max_steps = length(times)
+    kernel_params = KernelParams(times, path,
+                                 precomputed.distances_from_start,
+                                 speed, dist_slack, noise)
+    model_args_rest = (KernelState(NaN, Point(NaN, NaN)), kernel_params)
+    results = Dict{Int, Tuple{Vector{Float64},Vector{Float64}}}()
+    for num_particles in num_particles_list
+        ess_threshold = num_particles / 2
+        elapsed = Vector{Float64}(undef, num_reps)
+        lmls = Vector{Float64}(undef, num_reps)
+        for rep=1:num_reps
+            start = time_ns()
+            (traces, _, lml) = particle_filter(compiled_hmm, model_args_rest, max_steps,
+                                               num_particles, ess_threshold,
+                                               get_compiled_hmm_obs)
+            elapsed[rep] = Int(time_ns() - start) / 1e9
+            println("num_particles: $num_particles, lml estimate: $lml")
+            lmls[rep] = lml
+        end
+        results[num_particles] = (lmls, elapsed)
+    end
+
+    return results
+end
+
+### (2) compiled, with markov, custom proposal ###
+
+function particle_filtering_compiled_hmm_custom_proposal(params::Params,
+        measured_xs::Vector{Float64}, measured_ys::Vector{Float64},
+        num_particles_list::Vector{Int}, num_reps::Int)
+
+    precomputed = PrecomputedPathData(params)
+    times = params.times
+    speed = params.speed
+    dist_slack = params.dist_slack
+    noise = params.noise
+    path = params.path
 
     function get_fancy_compiled_hmm_init()
         observations = DynamicAssignment()
         observations[1 => :x] = measured_xs[1]
         observations[1 => :y] = measured_ys[1]
-        proposal_args = (1, (times[1], Float64(0.0), noise, Point(measured_xs[1], measured_ys[1]), posterior_var_d, posterior_covars, path, distances_from_start, speed, dist_slack))
+        proposal_args = (1, (times[1], Float64(0.0), noise,
+                         Point(measured_xs[1], measured_ys[1]),
+                         precomputed.posterior_var_d, precomputed.posterior_covars, path,
+                         precomputed.distances_from_start, speed, dist_slack))
         return (observations, proposal_args)
     end
 
@@ -500,13 +524,19 @@ function experiment()
         observations[step => :y] = measured_ys[step]
         prev_dist = get_assignment(trace)[step-1 => :dist]
         dt = step==1 ? times[step] : times[step] - times[step-1]
-        proposal_args = (step, (dt, prev_dist, noise, Point(measured_xs[step], measured_ys[step]), posterior_var_d, posterior_covars,  path, distances_from_start, speed, dist_slack))
+        proposal_args = (step, (dt, prev_dist, noise,
+                         Point(measured_xs[step], measured_ys[step]),
+                         precomputed.posterior_var_d, precomputed.posterior_covars,  path,
+                         precomputed.distances_from_start, speed, dist_slack))
         return (observations, proposal_args)
     end
 
-    kernel_params = KernelParams(times, path, distances_from_start, speed, dist_slack, noise)
+    max_steps = length(times)
+    kernel_params = KernelParams(times, params.path,
+                                 precomputed.distances_from_start,
+                                 speed, dist_slack, noise)
     model_args_rest = (KernelState(NaN, Point(NaN, NaN)), kernel_params)
-    results_compiled_external = Dict{Int, Tuple{Vector{Float64},Vector{Float64}}}()
+    results = Dict{Int, Tuple{Vector{Float64},Vector{Float64}}}()
     for num_particles in num_particles_list
         ess_threshold = num_particles / 2
         elapsed = Vector{Float64}(undef, num_reps)
@@ -518,23 +548,80 @@ function experiment()
                                                get_fancy_compiled_hmm_init,
                                                get_fancy_compiled_hmm_step,
                                                compiled_fancy_proposal,
-                                               compiled_fancy_proposal; verbose=verbose)
+                                               compiled_fancy_proposal)
             elapsed[rep] = Int(time_ns() - start) / 1e9
             println("num_particles: $num_particles, lml estimate: $lml")
             lmls[rep] = lml
         end
-        results_compiled_external[num_particles] = (lmls, elapsed)
+        results[num_particles] = (lmls, elapsed)
     end
 
- # particle filtering in lightweight hmm using external proposal ##
+    return results
+end
 
-    println("lightweight hmm (external proposal)..")
+### (3) lightweight, default proposal ###
+
+function particle_filtering_lightweight_hmm_default_proposal(params::Params,
+        measured_xs::Vector{Float64}, measured_ys::Vector{Float64},
+        num_particles_list::Vector{Int}, num_reps::Int)
+
+    precomputed = PrecomputedPathData(params)
+    times = params.times
+    speed = params.speed
+    dist_slack = params.dist_slack
+    noise = params.noise
+    path = params.path
+
+    function get_lightweight_hmm_obs(step::Int)
+        observations = DynamicAssignment()
+        observations[(:x, step)] = measured_xs[step]
+        observations[(:y, step)] = measured_ys[step]
+        return observations 
+    end
+
+    max_steps = length(times)
+    model_args_rest = (path, precomputed.distances_from_start, times, speed, noise, dist_slack)
+    results = Dict{Int, Tuple{Vector{Float64},Vector{Float64}}}()
+    for num_particles in num_particles_list
+        ess_threshold = num_particles / 2
+        elapsed = Vector{Float64}(undef, num_reps)
+        lmls = Vector{Float64}(undef, num_reps)
+        for rep=1:num_reps
+            start = time_ns()
+            (traces, _, lml) = particle_filter(lightweight_hmm, model_args_rest, max_steps, 
+                                               num_particles, ess_threshold,
+                                               get_lightweight_hmm_obs)
+            elapsed[rep] = Int(time_ns() - start) / 1e9
+            println("num_particles: $num_particles, lml estimate: $lml")
+            lmls[rep] = lml
+        end
+        results[num_particles] = (lmls, elapsed)
+    end
+
+    return results
+end
+
+### (4) lightweight, custom proposal ###
+
+function particle_filtering_lightweight_hmm_custom_proposal(params::Params,
+        measured_xs::Vector{Float64}, measured_ys::Vector{Float64},
+        num_particles_list::Vector{Int}, num_reps::Int)
+
+    precomputed = PrecomputedPathData(params)
+    times = params.times
+    speed = params.speed
+    dist_slack = params.dist_slack
+    noise = params.noise
+    path = params.path
 
     function get_fancy_lightweight_hmm_init()
         observations = DynamicAssignment()
         observations[(:x, 1)] = measured_xs[1]
         observations[(:y, 1)] = measured_ys[1]
-        proposal_args = (1, Float64(0.0), noise, Point(measured_xs[1], measured_ys[1]), posterior_var_d, posterior_covars,  path, distances_from_start, speed, times, dist_slack)
+        proposal_args = (1, Float64(0.0), noise,
+                         Point(measured_xs[1], measured_ys[1]),
+                         precomputed.posterior_var_d, precomputed.posterior_covars,  path,
+                         precomputed.distances_from_start, speed, times, dist_slack)
         return (observations, proposal_args)
     end
 
@@ -544,13 +631,19 @@ function experiment()
         observations[(:x, step)] = measured_xs[step]
         observations[(:y, step)] = measured_ys[step]
         prev_dist = get_assignment(trace)[(:dist, step-1)]
-        proposal_args = (step, prev_dist, noise, Point(measured_xs[step], measured_ys[step]), posterior_var_d, posterior_covars,  path, distances_from_start, speed, times, dist_slack)
+        proposal_args = (step, prev_dist, noise,
+                         Point(measured_xs[step], measured_ys[step]),
+                         precomputed.posterior_var_d, precomputed.posterior_covars,  path,
+                         precomputed.distances_from_start, speed, times, dist_slack)
         return (observations, proposal_args)
     end
 
-
-    model_args_rest = (path, distances_from_start, times, speed, noise, dist_slack)
-    results_lightweight_external = Dict{Int, Tuple{Vector{Float64},Vector{Float64}}}()
+    max_steps = length(times)
+    kernel_params = KernelParams(times, params.path,
+                                 precomputed.distances_from_start,
+                                 speed, dist_slack, noise)
+    model_args_rest = (path, precomputed.distances_from_start, times, speed, noise, dist_slack)
+    results = Dict{Int, Tuple{Vector{Float64},Vector{Float64}}}()
     for num_particles in num_particles_list
         ess_threshold = num_particles / 2
         elapsed = Vector{Float64}(undef, num_reps)
@@ -562,119 +655,69 @@ function experiment()
                                                get_fancy_lightweight_hmm_init,
                                                get_fancy_lightweight_hmm_step,
                                                lightweight_fancy_step_proposal,
-                                               lightweight_fancy_step_proposal;verbose=verbose)
+                                               lightweight_fancy_step_proposal)
             elapsed[rep] = Int(time_ns() - start) / 1e9
             println("num_particles: $num_particles, lml estimate: $lml")
             lmls[rep] = lml
         end
-        results_lightweight_external[num_particles] = (lmls, elapsed)
+        results[num_particles] = (lmls, elapsed)
     end
 
+    return results
+end
 
-    # particle filtering in lightweight hmm using internal proposal ##
-    println("lightweight hmm (internal proposal)..")
+# TODO
+## lightweight, with markov, default proposal ##
+## lightweight, with markov, custom proposal ##
 
-    function get_lightweight_hmm_obs(step::Int)
-        observations = DynamicAssignment()
-        observations[(:x, step)] = measured_xs[step]
-        observations[(:y, step)] = measured_ys[step]
-        return observations 
-    end
+function plot_results(results::Dict, num_particles_list::Vector{Int}, label::String, color::String)
+    median_elapsed = [median(results[num_particles][2]) for num_particles in num_particles_list]
+    mean_lmls = [mean(results[num_particles][1]) for num_particles in num_particles_list]
+    #println(results_lightweight_default_proposal)
+    plot(median_elapsed, mean_lmls, label=label, color=color)
+end
 
-    model_args_rest = (path, distances_from_start, times, speed, noise, dist_slack)
-    results_lightweight = Dict{Int, Tuple{Vector{Float64},Vector{Float64}}}()
-    for num_particles in num_particles_list
-        ess_threshold = num_particles / 2
-        elapsed = Vector{Float64}(undef, num_reps)
-        lmls = Vector{Float64}(undef, num_reps)
-        for rep=1:num_reps
-            start = time_ns()
-            (traces, _, lml) = particle_filter(lightweight_hmm, model_args_rest, max_steps, 
-                                               num_particles, ess_threshold,
-                                               get_lightweight_hmm_obs; verbose=verbose)
-            elapsed[rep] = Int(time_ns() - start) / 1e9
-            println("num_particles: $num_particles, lml estimate: $lml")
-            lmls[rep] = lml
-        end
-        results_lightweight[num_particles] = (lmls, elapsed)
-    end
+function experiment()
 
+    Random.seed!(0)
 
-   
+    # generate a path
+    maybe_path = plan_path(start, stop, scene, PlannerParams(300, 3.0, 2000, 1.))
+    @assert !isnull(maybe_path)
+    path = get(maybe_path)
 
-    ## particle filtering in compiled hmm using internal proposal ##
+    # precomputation
+    params = Params(times, speed, dist_slack, noise, path)
+    precomputed = PrecomputedPathData(params)
 
-    println("compiled hmm (internal proposal)..")
+    # generate ground truth locations and observations
+    model_args = (length(times), path, precomputed.distances_from_start, times, speed, noise, dist_slack)
+    trace = simulate(lightweight_hmm, model_args)
+    assignment = get_assignment(trace)
+    measured_xs = [assignment[(:x, i)] for i=1:length(times)]
+    measured_ys = [assignment[(:y, i)] for i=1:length(times)]
+    actual_dists = [assignment[(:dist, i)] for i=1:length(times)]
 
-    function get_compiled_hmm_obs(step::Int)
-        assignment = DynamicAssignment()
-        assignment[step => :x] = measured_xs[step]
-        assignment[step => :y] = measured_ys[step]
-        return assignment
-    end
+    # parameters for particle filtering
+    num_particles_list = [1, 3, 7, 10, 30, 100]
+    num_reps = 10
 
-    kernel_params = KernelParams(times, path, distances_from_start, speed, dist_slack, noise)
-    model_args_rest = (KernelState(NaN, Point(NaN, NaN)), kernel_params)
-    results_compiled = Dict{Int, Tuple{Vector{Float64},Vector{Float64}}}()
-    for num_particles in num_particles_list
-        ess_threshold = num_particles / 2
-        elapsed = Vector{Float64}(undef, num_reps)
-        lmls = Vector{Float64}(undef, num_reps)
-        for rep=1:num_reps
-            start = time_ns()
-            (traces, _, lml) = particle_filter(compiled_hmm, model_args_rest, max_steps,
-                                                     num_particles, ess_threshold,
-                                                     get_compiled_hmm_obs; verbose=verbose)
-            elapsed[rep] = Int(time_ns() - start) / 1e9
-            println("num_particles: $num_particles, lml estimate: $lml")
-            lmls[rep] = lml
-        end
-        results_compiled[num_particles] = (lmls, elapsed)
-    end
-
-
+    # do experiments
+    results_compiled_default_proposal = particle_filtering_compiled_hmm_default_proposal(params,
+        measured_xs, measured_ys, num_particles_list, num_reps)
+    results_compiled_custom_proposal = particle_filtering_compiled_hmm_custom_proposal(params,
+        measured_xs, measured_ys, num_particles_list, num_reps)
+    results_lightweight_default_proposal = particle_filtering_lightweight_hmm_default_proposal(params,
+        measured_xs, measured_ys, num_particles_list, num_reps)
+    results_lightweight_custom_proposal = particle_filtering_lightweight_hmm_custom_proposal(params,
+        measured_xs, measured_ys, num_particles_list, num_reps)
 
     # plot results
-
     figure(figsize=(8, 8))
-
-    median_elapsed = [median(results_lightweight[num_particles][2]) for num_particles in num_particles_list]
-    mean_lmls = [mean(results_lightweight[num_particles][1]) for num_particles in num_particles_list]
-    println("lightweight (default)")
-    println(results_lightweight)
-#    println(results_lightweight[100][2])
-#    println(median_elapsed)
-#    println(mean_lmls)
-    plot(median_elapsed, mean_lmls, label="lightweight (default)", color="blue")
-
-    median_elapsed = [median(results_compiled[num_particles][2]) for num_particles in num_particles_list]
-    mean_lmls = [mean(results_compiled[num_particles][1]) for num_particles in num_particles_list]
-    println("compiled (default)")
-    println(results_compiled)
-    # println(results_compiled[100][2])    
-    # println(median_elapsed)
-    # println(mean_lmls)
-    plot(median_elapsed, mean_lmls, label="compiled (default)", color="red")
-
-    median_elapsed = [median(results_lightweight_external[num_particles][2]) for num_particles in num_particles_list]
-    mean_lmls = [mean(results_lightweight_external[num_particles][1]) for num_particles in num_particles_list]
-    println("lightweight (custom)")
-    println(results_lightweight_external)
-    # println(results_lightweight_external[100][2])
-    # println(median_elapsed)
-    # println(mean_lmls)
-    plot(median_elapsed, mean_lmls, label="lightweight (custom)", color="cyan")
-
-    median_elapsed = [median(results_compiled_external[num_particles][2]) for num_particles in num_particles_list]
-    mean_lmls = [mean(results_compiled_external[num_particles][1]) for num_particles in num_particles_list]
-    println("compiled (custom)")
-    println(results_compiled_external)
-    # println(results_compiled_external[100][2])
-    # println(median_elapsed)
-    # println(mean_lmls)
-    plot(median_elapsed, mean_lmls, label="compiled (custom)", color="orange")
-
-
+    plot_results(results_lightweight_default_proposal, num_particles_list, "Lightweight (default proposal)", "blue")
+    plot_results(results_lightweight_custom_proposal, num_particles_list, "Lightweight (custom proposal)", "red")
+    plot_results(results_compiled_default_proposal, num_particles_list, "Compiled (default proposal)", "cyan")
+    plot_results(results_compiled_custom_proposal, num_particles_list, "Compiled (custom proposal)", "orange")
     ax = gca()
     ax[:set_xscale]("log")
     legend()
