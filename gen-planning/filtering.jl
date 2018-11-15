@@ -796,7 +796,7 @@ function experiment()
     println(measured_ys)
 
     # parameters for particle filtering
-    num_particles_list = [1, 2, 3, 5, 7, 10, 20, 30, 50, 70, 100, 200, 300]
+    num_particles_list = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 200, 300]
     num_reps = 50
 
     # experiments with compiled model
