@@ -4,6 +4,7 @@ using Printf: @sprintf
 import Random
 import Distributions
 using Statistics: median, mean
+using JLD
 
 include("scenes.jl")
 include("path_planner.jl")
@@ -62,30 +63,6 @@ function dist_mean(prev_state::KernelState, params::KernelParams, t::Int)
     else
         params.speed * params.times[1]
     end
-end
-
-@gen function lightweight_hmm_markov(step::Int, path::Path, distances_from_start::Vector{Float64},
-                                     times::Vector{Float64}, speed::Float64,
-                                     noise::Float64, dist_slack::Float64)
-    @assert step >= 1
-
-    # walk path
-    locations = Vector{Point}(undef, step)
-    dist = @addr(normal(speed * times[1], dist_slack), (:dist, 1))
-    locations[1] = walk_path(path, distances_from_start, dist)
-    for t=2:step
-        dist = @addr(normal(dist + speed * (times[t] - times[t-1]), dist_slack), (:dist, t))
-        locations[t] = walk_path(path, distances_from_start, dist)
-    end
-
-    # generate noisy observations
-    for t=1:step
-        point = locations[t]
-        @addr(normal(point.x, noise), (:x, t))
-        @addr(normal(point.y, noise), (:y, t))
-    end
-
-    return locations
 end
 
 @gen function lightweight_hmm_kernel(t::Int, prev_state::Any, params::KernelParams)
@@ -192,7 +169,22 @@ end
     @addr(piecewise_normal(probabilities, mus, stds, distances_from_start), :dist)
 end
 
-compiled_fancy_proposal = at_dynamic(markov_fancy_proposal_inner, Int)
+lightweight_markov_fancy_proposal = at_dynamic(markov_fancy_proposal_inner, Int)
+
+@compiled @gen function compiled_markov_fancy_proposal_inner(dt::Float64, prev_dist::Float64, noise :: Float64, obs :: Point,
+                                        posterior_var_d :: Float64, posterior_covars :: Vector{Matrix{Float64}},
+                                        path :: Path, distances_from_start :: Vector{Float64},
+                                        speed::Float64, dist_slack::Float64)
+
+    dist_params::Tuple{Vector{Float64},Vector{Float64},Vector{Float64},Vector{Float64}} = compute_custom_proposal_params(dt, prev_dist, noise, obs,
+                                                            posterior_var_d, posterior_covars, path, distances_from_start,
+                                                            speed, dist_slack)
+
+    @addr(piecewise_normal(dist_params[1], dist_params[2], dist_params[3], dist_params[4]), :dist)
+end
+
+compiled_fancy_proposal = at_dynamic(compiled_markov_fancy_proposal_inner, Int)
+
 
 
 #############################
@@ -755,8 +747,8 @@ function particle_filtering_lightweight_markov_hmm_custom_proposal(params::Param
             (traces, _, lml) = particle_filter(lightweight_hmm_with_markov, model_args_rest, max_steps,
                                                num_particles, ess_threshold,
                                                init, step,
-                                               compiled_fancy_proposal,
-                                               compiled_fancy_proposal)
+                                               lightweight_markov_fancy_proposal,
+                                               lightweight_markov_fancy_proposal)
             elapsed[rep] = Int(time_ns() - start) / 1e9
             println("num_particles: $num_particles, lml estimate: $lml, elapsed: $(elapsed[rep])")
             lmls[rep] = lml
@@ -782,6 +774,9 @@ function experiment()
     @assert !isnull(maybe_path)
     path = get(maybe_path)
 
+    println("path:")
+    println(path)
+
     # precomputation
     params = Params(times, speed, dist_slack, noise, path)
     precomputed = PrecomputedPathData(params)
@@ -794,9 +789,15 @@ function experiment()
     measured_ys = [assignment[(:y, i)] for i=1:length(times)]
     actual_dists = [assignment[(:dist, i)] for i=1:length(times)]
 
+    println("measured_xs:")
+    println(measured_xs)
+
+    println("measured_ys:")
+    println(measured_ys)
+
     # parameters for particle filtering
-    num_particles_list = [1, 3, 7, 10, 30, 100]
-    num_reps = 10
+    num_particles_list = [1, 2, 3, 5, 7, 10, 20, 30, 50, 70, 100, 200, 300]
+    num_reps = 50
 
     # experiments with compiled model
     results_compiled_default_proposal = particle_filtering_compiled_hmm_default_proposal(params,
@@ -816,20 +817,13 @@ function experiment()
     results_lightweight_markov_custom_proposal = particle_filtering_lightweight_markov_hmm_custom_proposal(params,
         measured_xs, measured_ys, num_particles_list, num_reps)
 
-    # plot results
-    figure(figsize=(8, 8))
-    plot_results(results_lightweight_default_proposal, num_particles_list, "Lightweight (default proposal)", "blue")
-    plot_results(results_lightweight_custom_proposal, num_particles_list, "Lightweight (custom proposal)", "red")
-    plot_results(results_lightweight_markov_default_proposal, num_particles_list, "Lightweight w/ markov (default proposal)", "purple")
-    plot_results(results_lightweight_markov_custom_proposal, num_particles_list, "Lightweight w/ markov (custom proposal)", "black")
-    plot_results(results_compiled_default_proposal, num_particles_list, "Compiled (default proposal)", "cyan")
-    plot_results(results_compiled_custom_proposal, num_particles_list, "Compiled (custom proposal)", "orange")
-    ax = gca()
-    ax[:set_xscale]("log")
-    legend()
-    xlabel("runtime (sec.)")
-    ylabel("log marginal likelihood est.")
-    savefig("filtering_results.png")
+    save("results.jld",
+        "results_compiled_default_proposal", results_compiled_default_proposal,
+        "results_compiled_custom_proposal", results_compiled_custom_proposal,
+        "results_lightweight_default_proposal", results_lightweight_default_proposal,
+        "results_lightweight_custom_proposal", results_lightweight_custom_proposal,
+        "results_lightweight_markov_default_proposal", results_lightweight_markov_default_proposal,
+        "results_lightweight_markov_custom_proposal", results_lightweight_markov_custom_proposal)
 end
 
 # NOTE: you have to separate compiled gen function definitions from calling API

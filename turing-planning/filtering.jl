@@ -174,15 +174,17 @@ measured_ys = [0.25469, 0.506397, 0.452324, 0.377185, 0.23247, 0.110536, 0.11206
     precomputed = PrecomputedPathData(params)
 
     # parameters for particle filtering
-    num_particles_list = [100000]#[1, 2, 3, 5, 7, 10, 20, 30, 50, 70, 100, 200, 300]
-    num_reps = 10
+    num_particles_list = [100]#[1, 2, 3, 5, 7, 10, 20, 30, 50, 70, 100, 200, 300]
+    num_reps = 20
 
     # experiments with compiled model
     results_turing = turing_do_particle_filtering(params,
             measured_xs, measured_ys, num_particles_list, num_reps)
 
-    save("results_turing.jld", "results_turing", results_turing)
+    return results_turing
 
 end
 
 experiment()
+results = experiment()
+save("results_turing.jld", "results_turing", results)

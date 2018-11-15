@@ -1,60 +1,89 @@
 using Statistics: median, mean, std
 using PyPlot
+using JLD
+using Printf: @sprintf
 
-lightweight_default = Dict(7=>([-132.263, -99.3544, -313.904, -105.278, -13.8298, -3.08166, 36.2298, 22.862, 40.9007, 7.96334], [0.0274241, 0.028031, 0.0287203, 0.0315791, 0.0311775, 0.0310223, 0.0311523, 0.0315584, 0.0310569, 0.0313358]),30=>([66.094, 65.3745, 63.5161, 69.1871, 29.3197, 62.2858, 63.0433, 43.1043, 65.8987, -0.207571], [0.144633, 0.153553, 0.170581, 0.185665, 0.19386, 0.194978, 0.214185, 0.201376, 0.24951, 0.169985]),100=>([66.6317, 65.3075, 67.3943, 66.802, 65.4179, 62.8759, 67.6391, 55.8278, 66.0029, 63.1833], [0.721403, 0.793555, 0.842553, 0.793399, 0.823989, 0.859583, 0.770616, 0.831294, 0.848548, 0.802401]),10=>([-57.7384, 27.9994, 52.1526, 47.94, 40.7956, 53.8799, 61.6629, 11.791, 43.9191, 9.5249], [0.0406248, 0.0432697, 0.0407722, 0.0443446, 0.0408722, 0.0429105, 0.0433698, 0.0399965, 0.0441032, 0.040018]),3=>([-638.639, -1435.09, -985.058, -247.599, -257.688, -554.373, -740.546, -732.748, -44.9043, -918.613], [0.0164004, 0.0994518, 0.0125269, 0.0152954, 0.0113727, 0.0110006, 0.0141011, 0.0107683, 0.0139067, 0.010694]),300=>([68.4211, 66.8348, 65.5038, 67.1074, 66.7778, 66.9238, 66.7328, 68.1253, 67.3335, 66.8473], [2.98795, 3.15405, 3.08605, 3.0977, 3.0257, 3.14297, 3.25948, 3.229, 3.21772, 3.1452]),1000=>([67.9997, 66.9613, 67.2316, 67.8548, 66.8995, 67.5189, 66.6294, 67.8363, 67.8666, 67.8145], [12.6035, 12.5469, 12.6848, 12.5736, 12.4239, 12.7334, 12.6592, 12.5036, 12.6985, 12.7557]),1=>([-1561.99, -5571.65, -1208.95, -5229.84, -936.297, -1208.95, -1106.96, -3013.01, -1208.95, -1948.43], [0.122594, 0.0355919, 0.00662183, 0.00585306, 0.00574834, 0.00481338, 0.00473113, 0.00477768, 0.0463136, 0.00660347]))
-compiled_default = Dict(7=>([30.5707, -57.5482, -60.5043, -714.963, 9.16647, -108.288, -33.4042, 30.7023, -39.2689, 35.7494], [0.00420133, 0.00399281, 0.00390416, 0.0222418, 0.00482044, 0.00463201, 0.00424993, 0.00428406, 0.00410828, 0.00418021]),30=>([64.3845, 67.3387, 46.7586, 64.2786, 38.1089, 62.7515, 53.2218, 35.2093, 60.5065, 47.9584], [0.0186461, 0.0167544, 0.0283789, 0.0173148, 0.0265512, 0.0192146, 0.0179178, 0.0280671, 0.0168442, 0.0271074]),100=>([65.4958, 67.4599, 65.4943, 67.5822, 61.5314, 69.0853, 65.7314, 61.3721, 66.7401, 67.1607], [0.0700016, 0.0668784, 0.0782564, 0.068777, 0.078151, 0.0719821, 0.0677744, 0.0779839, 0.0693978, 0.0710367]),10=>([29.7112, 50.8139, 43.2466, -102.441, 58.2524, 15.3191, 39.0572, 50.4675, -126.589, -55.8772], [0.00561155, 0.00542495, 0.0172095, 0.00669992, 0.00614956, 0.00587463, 0.00558729, 0.0055459, 0.00554548, 0.0153991]),3=>([-891.247, -1006.85, -173.213, -134.557, -198.027, -442.467, -510.571, -438.888, -87.6095, -210.127], [0.00191515, 0.00204722, 0.00202797, 0.00197334, 0.001904, 0.0018326, 0.00178765, 0.00174556, 0.00173515, 0.00171314]),300=>([67.3643, 66.9874, 66.0376, 66.192, 67.5819, 66.74, 67.0019, 66.4824, 67.484, 66.1672], [0.236614, 0.237712, 0.242532, 0.349905, 0.191306, 0.177161, 0.189636, 0.198097, 0.202601, 0.198799]),1000=>([67.4856, 67.412, 68.2179, 67.753, 67.9355, 67.9835, 67.5801, 66.8846, 68.19, 67.4553], [0.759062, 0.75824, 0.788635, 0.729856, 0.69805, 0.825565, 0.727036, 0.7967, 0.708217, 0.803566]),1=>([-1208.95, -6563.3, -1258.31, -10319.7, -3554.76, -1919.37, -9442.04, -1208.95, -7630.97, -2117.23], [0.287876, 0.000721903, 0.000717953, 0.000721379, 0.00073531, 0.000728623, 0.000724235, 0.000687663, 0.000707647, 0.000663765]))
-lightweight_custom = Dict(7=>([66.6743, 67.5961, 66.6112, 67.0343, 66.8716, 69.2182, 66.4551, 67.9772, 68.1155, 67.2113], [0.0396269, 0.0347897, 0.0343077, 0.0356805, 0.0348168, 0.0358171, 0.0394682, 0.0360943, 0.036919, 0.0413986]),30=>([66.9439, 67.1118, 67.4404, 67.3797, 67.0871, 68.3191, 67.9034, 66.1153, 67.3924, 67.5766], [0.174849, 0.222284, 0.22005, 0.226577, 0.238679, 0.241832, 0.246798, 0.250905, 0.316292, 0.19818]),100=>([68.1548, 67.8289, 67.1483, 67.5754, 67.5033, 67.474, 68.0896, 67.2954, 68.2129, 67.5057], [0.853145, 0.875573, 0.892251, 0.963013, 0.982401, 1.04533, 0.871844, 0.958299, 0.982034, 1.02787]),10=>([67.8976, 68.9223, 67.1933, 66.6019, 66.3644, 67.1573, 66.3821, 67.7651, 67.0317, 68.7276], [0.0652308, 0.0566267, 0.0503544, 0.0529996, 0.0535998, 0.0505444, 0.0541461, 0.0554163, 0.0552643, 0.0520672]),3=>([66.2894, 67.8458, 63.5722, 68.5551, 65.1851, 66.9352, 69.5948, 66.0955, 67.6461, 67.2558], [0.0184501, 0.0141567, 0.0187859, 0.0137894, 0.0173413, 0.0134427, 0.0172781, 0.0135121, 0.0177069, 0.0133654]),300=>([67.5497, 67.7344, 67.705, 67.8459, 67.7648, 67.5592, 67.8152, 67.5011, 67.7297, 67.4604], [3.37344, 3.41002, 3.45495, 3.43805, 3.13072, 2.70757, 2.84412, 2.88341, 3.29564, 3.39078]),1000=>([67.7097, 67.5736, 67.7222, 67.8619, 67.5972, 67.8425, 67.5425, 67.5645, 67.7315, 67.6282], [13.9516, 13.8056, 13.8589, 13.9035, 13.9079, 13.8747, 14.0917, 13.8845, 13.7107, 13.9196]),1=>([58.6405, 59.6562, 64.0537, 69.126, 59.571, 52.9462, 67.8122, 68.0672, 67.706, 62.0859], [0.547144, 0.00470533, 0.00451531, 0.00448127, 0.00448926, 0.00909758, 0.00458792, 0.00439468, 0.00438777, 0.00436599]))
-compiled_custom = Dict(7=>([65.9768, 65.8634, 67.0248, 66.3801, 66.54, 67.9778, 66.7136, 67.6554, 68.2622, 65.9589], [0.0114046, 0.0106655, 0.0109908, 0.0175648, 0.011726, 0.0106118, 0.0102547, 0.0145876, 0.0105696, 0.0101513]),30=>([68.4826, 67.9421, 67.5049, 67.7768, 67.4906, 68.5737, 67.5448, 67.5524, 67.16, 68.4487], [0.0457981, 0.044482, 0.0445108, 0.04893, 0.0518464, 0.0518699, 0.0505204, 0.0463368, 0.0433361, 0.0436979]),100=>([67.7787, 68.0338, 67.6994, 67.9228, 67.6059, 67.6414, 68.1067, 67.5385, 67.8687, 67.5155], [0.158526, 0.161008, 0.174752, 0.165215, 0.169678, 0.168259, 0.174544, 0.189067, 0.194819, 0.236684]),10=>([67.7995, 67.454, 66.611, 68.268, 69.3613, 66.8608, 67.2664, 66.8666, 66.7026, 65.9081], [0.0140171, 0.0178384, 0.0138623, 0.0126161, 0.0179028, 0.0133196, 0.0122661, 0.0181078, 0.0140345, 0.0175846]),3=>([66.5442, 67.2146, 66.5463, 68.3152, 67.1342, 67.5471, 67.0331, 65.8074, 67.4564, 69.0545], [0.00478156, 0.00479601, 0.00445784, 0.00446249, 0.00448687, 0.00455744, 0.00451734, 0.00441667, 0.00462043, 0.0107342]),300=>([67.9471, 67.8016, 67.6598, 67.5842, 67.7332, 67.9809, 67.3294, 68.1439, 67.3672, 67.5781], [0.478513, 0.475438, 0.529977, 0.508291, 0.498522, 0.501861, 0.509317, 0.57011, 0.461802, 0.482491]),1000=>([67.7487, 67.5735, 67.7788, 67.5523, 67.6524, 67.5194, 67.5931, 67.7214, 67.7049, 67.5625], [1.94414, 1.84695, 1.92183, 1.92881, 1.93317, 1.84252, 1.90718, 1.88443, 1.98127, 1.95645]),1=>([64.7322, 67.1947, 67.5425, 69.7422, 64.358, 65.4955, 66.4912, 64.8397, 68.0923, 65.9541], [2.86437, 0.00153428, 0.00151358, 0.00161515, 0.00151701, 0.00147735, 0.00147299, 0.00144991, 0.00154088, 0.0015005]))
+function print_runtimes(num_particles_list::Vector{Int}, results::Dict, label::String)
+    median_times = [median(results[num_particles][2]) for num_particles in num_particles_list]
+    stdev_times = [std(results[num_particles][2]) for num_particles in num_particles_list]
+    for (num_particles, median_time, stdev_time) in zip(num_particles_list, median_times, stdev_times)
+        str = @sprintf("%s, %d particles: %0.3f +/- %0.3f", label, num_particles, median_time, stdev_time)
+        println(str)
+    end
+end
 
-num_particles_list_custom = [1, 7, 10, 30, 100, 300, 1000]
-num_particles_list_default = [1, 7, 10, 30, 100, 300, 1000]
+function plot_results(num_particles_list::Vector{Int}, results::Dict, label::String, color::String)
+    median_times = [median(results[num_particles][2]) for num_particles in num_particles_list]
+    stdev_times = [std(results[num_particles][2]) for num_particles in num_particles_list]
+    mean_lmls = [mean(results[num_particles][1]) for num_particles in num_particles_list]
+    stdev_lmls = [std(results[num_particles][1]) for num_particles in num_particles_list]
+    plot(median_times, mean_lmls, 
+	    color=color,
+	    label=label)
+end
 
-# Compute stats
-lw_def_median_times = [median(lightweight_default[num_particles][2]) for num_particles in num_particles_list_default]
-lw_def_mean_lmls = [mean(lightweight_default[num_particles][1]) for num_particles in num_particles_list_default]
-lw_def_stdev_lmls = [std(lightweight_default[num_particles][1]) for num_particles in num_particles_list_default]
+results = load("results.jld")
+results_turing = load("../turing-planning/results_turing.jld")
 
-cp_def_median_times = [median(compiled_default[num_particles][2]) for num_particles in num_particles_list_default]
-cp_def_mean_lmls = [mean(compiled_default[num_particles][1]) for num_particles in num_particles_list_default]
-cp_def_stdev_lmls = [std(compiled_default[num_particles][1]) for num_particles in num_particles_list_default]
+# experiments with compiled model
+results_compiled_default_proposal = results["results_compiled_default_proposal"]
+results_compiled_custom_proposal = results["results_compiled_custom_proposal"]
 
-lw_custom_median_times = [median(lightweight_custom[num_particles][2]) for num_particles in num_particles_list_custom]
-lw_custom_mean_lmls = [mean(lightweight_custom[num_particles][1]) for num_particles in num_particles_list_custom]
-lw_custom_stdev_lmls = [std(lightweight_custom[num_particles][1]) for num_particles in num_particles_list_custom]
+# experiments with lightweight model (no markov)
+results_lightweight_default_proposal = results["results_lightweight_default_proposal"]
+results_lightweight_custom_proposal = results["results_lightweight_custom_proposal"]
 
-cp_custom_median_times = [median(compiled_custom[num_particles][2]) for num_particles in num_particles_list_custom]
-cp_custom_mean_lmls = [mean(compiled_custom[num_particles][1]) for num_particles in num_particles_list_custom]
-cp_custom_stdev_lmls = [std(compiled_custom[num_particles][1]) for num_particles in num_particles_list_custom]
+# experiments with markov
+results_lightweight_markov_default_proposal = results["results_lightweight_markov_default_proposal"]
+results_lightweight_markov_custom_proposal = results["results_lightweight_markov_custom_proposal"]
 
+# Turing.jl
+results_turing = results_turing["results_turing"]
+
+const num_particles_list_default = [10, 20, 30, 50, 70, 100, 200, 300]
+const num_particles_list_custom = [1, 2, 3, 5, 7, 10, 20, 30, 50, 70, 100, 200, 300]
+
+#######################
+# print runtime table #
+#######################
+
+print_runtimes([100], results_turing, "Turing")
+print_runtimes([100], results_compiled_default_proposal, "Restricted DSL  + unfold (default proposal)")
+print_runtimes([100], results_lightweight_default_proposal, "Flexible DSL (default proposal)")
+print_runtimes([100], results_lightweight_markov_default_proposal, "Flexible DSL + unfold (default proposal)")
+
+# Turing, 100 particles: 0.306 +/- 0.153
+# Restricted DSL  + unfold (default proposal), 100 particles: 0.013 +/- 0.002
+# Flexible DSL (default proposal), 100 particles: 0.926 +/- 0.066
+#Flexible DSL + unfold (default proposal), 100 particles: 0.078 +/- 0.007
+
+##################
+# generate plots #
+##################
+
+# plot of all data
 figure(figsize=(4,3))
-errorbar(lw_def_median_times, 
-	 lw_def_mean_lmls, 
-	 yerr=lw_def_stdev_lmls,
-	 color="blue", 
-	 ecolor="black",
-	 label="Flexible DSL (default proposal)")
-errorbar(cp_def_median_times,
-	 cp_def_mean_lmls,
-	 yerr=cp_def_stdev_lmls,
-	 color="orange", 
-	 ecolor="black",
-	 label="Restricted DSL (default proposal)")
-errorbar(lw_custom_median_times,
-	 lw_custom_mean_lmls,
-	 yerr=lw_custom_stdev_lmls,
-	 color="lightblue", 
-	 ecolor="black",
-	 label="Flexible DSL (custom proposal)")
-errorbar(cp_custom_median_times,
-	 cp_custom_mean_lmls,
-	 yerr=cp_custom_stdev_lmls,
-	 color="red", 
-	 ecolor="black",
-	 label="Restricted DSL (custom proposal)")
-
+plot_results(num_particles_list_default, results_compiled_default_proposal, "Restricted DSL + unfold (default proposal)", "blue")
+plot_results(num_particles_list_custom, results_compiled_custom_proposal, "Restricted DSL + unfold (custom proposal)", "orange")
+plot_results(num_particles_list_default, results_lightweight_default_proposal, "Flexible DSL (default proposal)", "lightblue")
+plot_results(num_particles_list_custom, results_lightweight_custom_proposal, "Flexible DSL (custom proposal)", "red")
+plot_results(num_particles_list_default, results_lightweight_markov_default_proposal, "Flexible DSL + unfold (default proposal)", "green")
+plot_results(num_particles_list_custom, results_lightweight_markov_custom_proposal, "Flexible DSL + unfold (custom proposal)", "purple")
 legend(loc="lower right")
 ylabel("log probability")
 xlabel("seconds")
 gca()[:set_xscale]("log")
 tight_layout()
-savefig("scores.pdf")
+savefig("lml_estimates.pdf")
+
+# plot of only custom proposal data (zoomed)
+figure(figsize=(4,3))
+plot_results(num_particles_list_custom, results_compiled_custom_proposal, "Restricted DSL + unfold (custom proposal)", "orange")
+plot_results(num_particles_list_custom, results_lightweight_custom_proposal, "Flexible DSL (custom proposal)", "red")
+plot_results(num_particles_list_custom, results_lightweight_markov_custom_proposal, "Flexible DSL + unfold (custom proposal)", "purple")
+legend(loc="lower right")
+ylabel("log probability")
+xlabel("seconds")
+gca()[:set_xscale]("log")
+tight_layout()
+savefig("lml_estimates_zoomed.pdf")
