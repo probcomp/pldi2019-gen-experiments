@@ -1,0 +1,9 @@
+[deps]
+FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
+ImageCore = "a09fc81d-aa75-5fe9-8630-4744c3626534"
+JLD = "4138dd39-2aa7-5051-a626-17a0bb65d9c8"
+Libtask = "6f1fad26-d15e-5dc8-ae53-837a1d7b8c9f"
+Nullables = "4d1e1d77-625e-5b40-9113-a560ec7a8ecd"
+PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
+PyPlot = "d330b81b-6aea-500a-939a-2ce795aea3ee"
+Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
