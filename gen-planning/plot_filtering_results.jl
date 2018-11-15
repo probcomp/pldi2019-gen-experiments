@@ -17,6 +17,8 @@ function plot_results(num_particles_list::Vector{Int}, results::Dict, label::Str
     stdev_times = [std(results[num_particles][2]) for num_particles in num_particles_list]
     mean_lmls = [mean(results[num_particles][1]) for num_particles in num_particles_list]
     stdev_lmls = [std(results[num_particles][1]) for num_particles in num_particles_list]
+    println("min: $(minimum(mean_lmls)))")
+    println("max: $(maximum(mean_lmls)))")
     plot(median_times, mean_lmls, 
 	    color=color,
 	    label=label)
@@ -40,7 +42,7 @@ results_lightweight_markov_custom_proposal = results["results_lightweight_markov
 # Turing.jl
 results_turing = results_turing["results_turing"]
 
-const num_particles_list_default = [10, 20, 30, 50, 70, 100, 200, 300]
+const num_particles_list_default = [20, 30, 50, 70, 100, 200, 300]
 const num_particles_list_custom = [1, 2, 3, 5, 7, 10, 20, 30, 50, 70, 100, 200, 300]
 
 #######################
@@ -62,28 +64,13 @@ print_runtimes([100], results_lightweight_markov_default_proposal, "Flexible DSL
 ##################
 
 # plot of all data
-figure(figsize=(4,3))
-plot_results(num_particles_list_default, results_compiled_default_proposal, "Restricted DSL + unfold (default proposal)", "blue")
-plot_results(num_particles_list_custom, results_compiled_custom_proposal, "Restricted DSL + unfold (custom proposal)", "orange")
-plot_results(num_particles_list_default, results_lightweight_default_proposal, "Flexible DSL (default proposal)", "lightblue")
-plot_results(num_particles_list_custom, results_lightweight_custom_proposal, "Flexible DSL (custom proposal)", "red")
-plot_results(num_particles_list_default, results_lightweight_markov_default_proposal, "Flexible DSL + unfold (default proposal)", "green")
-plot_results(num_particles_list_custom, results_lightweight_markov_custom_proposal, "Flexible DSL + unfold (custom proposal)", "purple")
+
+figure(figsize=(4,2))
+plot_results(num_particles_list_custom, results_compiled_custom_proposal, "Custom Proposal", "orange")
+plot_results(num_particles_list_default, results_compiled_default_proposal, "Default Proposal", "blue")
 legend(loc="lower right")
-ylabel("log probability")
+ylabel("Accuracy (LML estimate)")
 xlabel("seconds")
 gca()[:set_xscale]("log")
 tight_layout()
 savefig("lml_estimates.pdf")
-
-# plot of only custom proposal data (zoomed)
-figure(figsize=(4,3))
-plot_results(num_particles_list_custom, results_compiled_custom_proposal, "Restricted DSL + unfold (custom proposal)", "orange")
-plot_results(num_particles_list_custom, results_lightweight_custom_proposal, "Flexible DSL (custom proposal)", "red")
-plot_results(num_particles_list_custom, results_lightweight_markov_custom_proposal, "Flexible DSL + unfold (custom proposal)", "purple")
-legend(loc="lower right")
-ylabel("log probability")
-xlabel("seconds")
-gca()[:set_xscale]("log")
-tight_layout()
-savefig("lml_estimates_zoomed.pdf")
