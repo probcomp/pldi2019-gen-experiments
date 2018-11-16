@@ -298,12 +298,12 @@ savefig("data.png")
 figure(figsize=FIGSIZE)
 render_linreg(trace, xlim, ylim; line_alpha=1.0, show_points=false)
 tight_layout()
-savefig("final_line.png")
+savefig("final_line.pdf")
 
 figure(figsize=FIGSIZE)
 render_linreg(trace, xlim, ylim; point_alpha=1.0, show_line=false, show_color=true)
 tight_layout()
-savefig("final_points.png")
+savefig("final_points.pdf")
 
 exit()
 
