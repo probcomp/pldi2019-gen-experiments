@@ -323,23 +323,14 @@ end
 (init_trace, trace, elapsed2, scores2) = do_ransac_inference(10)  # prog 3
 (init_trace, trace, elapsed3, scores3) = do_gradient_inference(10) # prog 2
 
-#################
-# plot data set #
-#################
-
-const FIGSIZE=(2,2)
-const xlim = (-5, 5)
-const ylim = (-15, 15)
-
-figure(figsize=FIGSIZE)
-render_dataset(xs, ys, xlim, ylim)
-tight_layout()
-savefig("data.pdf")
-
 
 #########################################
 # generate 'results of inference' plots #
 #########################################
+
+const FIGSIZE=(2,2)
+const xlim = (-5, 5)
+const ylim = (-15, 15)
 
 Random.seed!(2)
 
