@@ -1,4 +1,6 @@
-using Gen
+import Gen
+using Gen: @gen, @trace, normal, Unfold, logsumexp, simulate, choicemap, initialize_particle_filter, maybe_resample!, UnknownChange, NoChange, particle_filter_step!, log_ml_estimate, call_at, get_choices, categorical
+using Turing
 using PyPlot
 using Printf: @sprintf
 import Random
@@ -10,6 +12,92 @@ const patches = PyPlot.matplotlib[:patches]
 
 include("piecewise_normal.jl")
 include("geometry.jl")
+
+const times = collect(range(0, stop=1, length=20))
+const start_x = 0.1
+const start_y = 0.1
+const stop_x = 0.5
+const stop_y = 0.5
+const speed = 0.5
+const noise = 0.02
+const dist_slack = 0.2
+const start = Point(start_x, start_y)
+const stop = Point(stop_x, stop_y)
+const path = Path(Point(0.1, 0.1), Point(0.5, 0.5), Point[Point(0.1, 0.1), Point(0.0773627, 0.146073), Point(0.167036, 0.655448), Point(0.168662, 0.649074), Point(0.156116, 0.752046), Point(0.104823, 0.838075), Point(0.196407, 0.873581), Point(0.390309, 0.988468), Point(0.408272, 0.91336), Point(0.5, 0.5)])
+const distances_from_start = compute_distances_from_start(path)
+
+###########################################
+# evaluation harness for particle filters #
+###########################################
+
+struct Params
+    times::Vector{Float64}
+    speed::Float64
+    dist_slack::Float64
+    noise::Float64
+    path::Path
+end
+
+struct PrecomputedPathData
+    posterior_var_d::Float64
+    posterior_covars::Vector{Matrix{Float64}}
+    distances_from_start::Vector{Float64}
+end
+
+function PrecomputedPathData(params::Params)
+    times = params.times
+    speed = params.speed
+    dist_slack = params.dist_slack
+    noise = params.noise
+    path = params.path
+
+    distances_from_start = compute_distances_from_start(path)
+
+    # posterior_var_d is the variance of the posterior on d' given x and y.
+    # posterior_covars is a vector of 2x2 covariance matrices, representing the
+    # covariance of x and y when d' has been marginalized out.
+    posterior_var_d = dist_slack^2 * noise^2 / (dist_slack^2 + noise^2)
+    posterior_covars = Vector{Matrix{Float64}}(undef, length(distances_from_start))
+    for i = 2:length(distances_from_start)
+        dd = distances_from_start[i] - distances_from_start[i-1]
+        dx = path.points[i].x - path.points[i-1].x 
+        dy = path.points[i].y - path.points[i-1].y
+        posterior_covars[i] = [noise 0; 0 noise] .+ (dist_slack^2/dd^2 .* [dx^2 dx*dy; dy*dx dy^2])
+    end
+
+    PrecomputedPathData(posterior_var_d, posterior_covars, distances_from_start)
+end
+
+function evaluate_particle_filter(pf::Function, params::Params,
+            measured_xs::Vector{Float64}, measured_ys::Vector{Float64},
+            num_particles_list::Vector{Int}, num_reps::Int)
+
+    precomputed = PrecomputedPathData(params)
+    times = params.times
+    speed = params.speed
+    dist_slack = params.dist_slack
+    noise = params.noise
+    path = params.path
+
+    results = Dict{Int, Tuple{Vector{Float64},Vector{Float64}}}()
+    for num_particles in num_particles_list
+        ess_threshold = num_particles / 2
+        elapsed = Vector{Float64}(undef, num_reps)
+        lmls = Vector{Float64}(undef, num_reps)
+        for rep=1:num_reps
+            start = time_ns()
+        
+            # run the particle filter
+            lml = pf(measured_xs, measured_ys, num_particles, precomputed, path, times, speed, noise, dist_slack)
+
+            # record results
+            elapsed[rep] = Int(time_ns() - start) / 1e9
+            lmls[rep] = lml
+        end
+        results[num_particles] = (lmls, elapsed)
+    end
+    return results
+end
 
 ########################################
 # variants of the HMM generative model #
@@ -187,20 +275,6 @@ end
 # show prior samples #
 ######################
 
-const times = collect(range(0, stop=1, length=20))
-const start_x = 0.1
-const start_y = 0.1
-const stop_x = 0.5
-const stop_y = 0.5
-const speed = 0.5
-const noise = 0.02
-const dist_slack = 0.2
-const start = Point(start_x, start_y)
-const stop = Point(stop_x, stop_y)
-
-const path = Path(Point(0.1, 0.1), Point(0.5, 0.5), Point[Point(0.1, 0.1), Point(0.0773627, 0.146073), Point(0.167036, 0.655448), Point(0.168662, 0.649074), Point(0.156116, 0.752046), Point(0.104823, 0.838075), Point(0.196407, 0.873581), Point(0.390309, 0.988468), Point(0.408272, 0.91336), Point(0.5, 0.5)])
-const distances_from_start = compute_distances_from_start(path)
-
 function show_prior_samples()
     Random.seed!(0)
 
@@ -226,82 +300,8 @@ function show_prior_samples()
         render_hmm_trace(start, stop, path, times, speed, noise, dist_slack, trace, (tr, i) -> tr[i => :x], (tr, i) -> tr[i => :y], ax)
     end
     savefig("static_hmm_prior_samples.png")
-
 end
 
-
-###########################################
-# evaluation harness for particle filters #
-###########################################
-
-struct Params
-    times::Vector{Float64}
-    speed::Float64
-    dist_slack::Float64
-    noise::Float64
-    path::Path
-end
-
-struct PrecomputedPathData
-    posterior_var_d::Float64
-    posterior_covars::Vector{Matrix{Float64}}
-    distances_from_start::Vector{Float64}
-end
-
-function PrecomputedPathData(params::Params)
-    times = params.times
-    speed = params.speed
-    dist_slack = params.dist_slack
-    noise = params.noise
-    path = params.path
-
-    distances_from_start = compute_distances_from_start(path)
-
-    # posterior_var_d is the variance of the posterior on d' given x and y.
-    # posterior_covars is a vector of 2x2 covariance matrices, representing the
-    # covariance of x and y when d' has been marginalized out.
-    posterior_var_d = dist_slack^2 * noise^2 / (dist_slack^2 + noise^2)
-    posterior_covars = Vector{Matrix{Float64}}(undef, length(distances_from_start))
-    for i = 2:length(distances_from_start)
-        dd = distances_from_start[i] - distances_from_start[i-1]
-        dx = path.points[i].x - path.points[i-1].x 
-        dy = path.points[i].y - path.points[i-1].y
-        posterior_covars[i] = [noise 0; 0 noise] .+ (dist_slack^2/dd^2 .* [dx^2 dx*dy; dy*dx dy^2])
-    end
-
-    PrecomputedPathData(posterior_var_d, posterior_covars, distances_from_start)
-end
-
-function evaluate_particle_filter(pf::Function, params::Params,
-            measured_xs::Vector{Float64}, measured_ys::Vector{Float64},
-            num_particles_list::Vector{Int}, num_reps::Int)
-
-    precomputed = PrecomputedPathData(params)
-    times = params.times
-    speed = params.speed
-    dist_slack = params.dist_slack
-    noise = params.noise
-    path = params.path
-
-    results = Dict{Int, Tuple{Vector{Float64},Vector{Float64}}}()
-    for num_particles in num_particles_list
-        ess_threshold = num_particles / 2
-        elapsed = Vector{Float64}(undef, num_reps)
-        lmls = Vector{Float64}(undef, num_reps)
-        for rep=1:num_reps
-            start = time_ns()
-        
-            # run the particle filter
-            lml = pf(measured_xs, measured_ys, num_particles, precomputed, path, times, speed, noise, dist_slack)
-
-            # record results
-            elapsed[rep] = Int(time_ns() - start) / 1e9
-            lmls[rep] = lml
-        end
-        results[num_particles] = (lmls, elapsed)
-    end
-    return results
-end
 
 
 ####################################
@@ -580,6 +580,50 @@ function lightweight_unfold_custom_proposal_pf(measured_xs, measured_ys,
     return lml
 end
 
+##############
+# Turing SMC #
+##############
+
+@model turing_model(x_obs, y_obs, path, distances_from_start, times, speed, noise, dist_slack) = begin
+    steps = length(x_obs)
+    
+    # walk path
+    locations = Vector{Point}(undef, steps)
+    dists = Vector{Float64}(undef,steps)
+    dists[1] ~ Normal(speed * times[1], dist_slack)
+    locations[1] = walk_path(path, distances_from_start, dists[1])
+    for t=2:steps
+        dists[t] ~ Normal(dists[t-1] + speed * (times[t] - times[t-1]), dist_slack)
+        locations[t] = walk_path(path, distances_from_start, dists[t])
+    end
+
+    # generate noisy observations
+    for t=1:steps
+        point = locations[t]
+        x_obs[t] ~ Normal(point.x, noise)
+        y_obs[t] ~ Normal(point.y, noise)
+    end
+
+    return locations
+end
+
+function turing_pf(measured_xs, measured_ys, num_particles, precomputed, path, times, speed, noise, dist_slack)
+    spl = Turing.Sampler(Turing.SMC(num_particles, Turing.resample_multinomial, 0.5, Set(), 0))
+    particles = Turing.ParticleContainer{Turing.Trace}(turing_model(measured_xs, measured_ys, path, precomputed.distances_from_start, times, speed, noise, dist_slack))
+    push!(particles, spl.alg.n_particles, spl, Turing.VarInfo())
+    while Libtask.consume(particles) != Val{:done}
+      ess = Turing.effectiveSampleSize(particles)
+      if ess <= spl.alg.resampler_threshold * length(particles)
+        Turing.resample!(particles,spl.alg.resampler)
+      end
+    end
+    return particles.logE
+end
+
+###################
+# run experiments #
+###################
+
 function plot_results(results::Dict, num_particles_list::Vector{Int}, label::String, color::String)
     median_elapsed = [median(results[num_particles][2]) for num_particles in num_particles_list]
     mean_lmls = [mean(results[num_particles][1]) for num_particles in num_particles_list]
@@ -590,33 +634,19 @@ function experiment()
 
     Random.seed!(0)
 
-    # generate a path
     path = Path(Point(0.1, 0.1), Point(0.5, 0.5), Point[Point(0.1, 0.1), Point(0.0773627, 0.146073), Point(0.167036, 0.655448), Point(0.168662, 0.649074), Point(0.156116, 0.752046), Point(0.104823, 0.838075), Point(0.196407, 0.873581), Point(0.390309, 0.988468), Point(0.408272, 0.91336), Point(0.5, 0.5)])
-
-    println("path:")
-    println(path)
-
-    # precomputation
+    measured_xs = [0.0896684, 0.148145, 0.123211, 0.11035, 0.148417, 0.185746, 0.175872, 0.178704, 0.150475, 0.175573, 0.150151, 0.172628, 0.121426, 0.222041, 0.155273, 0.164001, 0.136586, 0.0687045, 0.146904, 0.163813]
+    measured_ys = [0.217256, 0.416599, 0.376985, 0.383586, 0.500322, 0.608227, 0.632844, 0.653351, 0.532425, 0.881112, 0.771766, 0.653384, 0.756946, 0.870473, 0.8697, 0.808217, 0.598147, 0.163257, 0.611928, 0.657514]
+    
     params = Params(times, speed, dist_slack, noise, path)
-    precomputed = PrecomputedPathData(params)
-
-    # generate ground truth locations and observations
-    args = (length(times), path, precomputed.distances_from_start, times, speed, noise, dist_slack)
-    trace = simulate(lightweight_hmm, args)
-    assignment = get_choices(trace)
-    measured_xs = [assignment[(:x, i)] for i=1:length(times)]
-    measured_ys = [assignment[(:y, i)] for i=1:length(times)]
-    actual_dists = [assignment[(:dist, i)] for i=1:length(times)]
-
-    println("measured_xs:")
-    println(measured_xs)
-
-    println("measured_ys:")
-    println(measured_ys)
 
     # parameters for particle filtering
     num_particles_list = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 200, 300]
     num_reps = 50
+
+    # experiments with Turing
+    results_turing = evaluate_particle_filter(turing_pf,
+        params, measured_xs, measured_ys, num_particles_list, num_reps)
 
     # experiments with static model
     results_static_default_proposal = evaluate_particle_filter(static_default_proposal_pf,
@@ -637,6 +667,7 @@ function experiment()
         params, measured_xs, measured_ys, num_particles_list, num_reps)
 
     save("results.jld",
+        "results_turing", results_turing,
         "results_static_default_proposal", results_static_default_proposal,
         "results_static_custom_proposal", results_static_custom_proposal,
         "results_lightweight_default_proposal", results_lightweight_default_proposal,

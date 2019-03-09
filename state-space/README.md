@@ -47,4 +47,4 @@ $$Z = \int_{-\infty}^{D_1} g(d_i) d d_i + \sum_{k=1}^{K-1} \int_{D_k}^{D_{k+1}} 
 Because, within each interval, the model is a linear Gaussian state space model (the functions $f_x$ and $f_y$ are linear in $d_i$ within an interval), we can analytically compute each of these $K+1$ terms, denoted $Z_k$ for $k=1\ldots K+1$.
 The probability that $d_i$ lies in interval $k$ is given by $Z_k / Z$.
 Conditioned on the choice of interval, $d_i$ has a normal distribution.
-Therefore, our custom proposal distribution on $d_i$ takes the form of a *piecewise normal distribution*.
+Therefore, our custom proposal distribution on $d_i$ takes the form of a *piecewise truncated normal distribution*.
