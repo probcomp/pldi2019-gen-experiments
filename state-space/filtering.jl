@@ -6,14 +6,14 @@ import Distributions
 using Statistics: median, mean
 using JLD
 
-include("scenes.jl")
-include("render.jl")
-include("path_planner.jl")
-include("piecewise_normal.jl")
+const patches = PyPlot.matplotlib[:patches]
 
-#####################################
-# lightweight implementation of hmm #
-#####################################
+include("piecewise_normal.jl")
+include("geometry.jl")
+
+########################################
+# variants of the HMM generative model #
+########################################
 
 @gen function lightweight_hmm(step::Int, path::Path, distances_from_start::Vector{Float64},
                               times::Vector{Float64}, speed::Float64,
@@ -39,11 +39,6 @@ include("piecewise_normal.jl")
     return locations
 end
 
-
-##############################################################
-# lightweight and static implementations of hmm, with unfold #
-##############################################################
-
 struct KernelState
     dist::Float64
     loc::Point
@@ -67,7 +62,7 @@ function dist_mean(prev_state::KernelState, params::KernelParams, t::Int)
 end
 
 @gen function lightweight_hmm_kernel(t::Int, prev_state::Any, params::KernelParams)
-    # NOTE: if t = 1 then prev_state will have all NaNs
+    # NOTE: if t = 1 then prev_state contains all NaNs
     dist = @trace(normal(dist_mean(prev_state, params, t), params.dist_slack), :dist)
     loc = walk_path(params.path, params.distances_from_start, dist)
     @trace(normal(loc.x, params.noise), :x)
@@ -75,10 +70,11 @@ end
     return KernelState(dist, loc)
 end
 
+# args: (num_steps::Int, init_state::KernelState, params::KernelParams)
 lightweight_hmm_with_unfold = Unfold(lightweight_hmm_kernel)
 
 @gen (static) function static_hmm_kernel(t::Int, prev_state::KernelState, params::KernelParams)
-    # NOTE: if t = 1 then prev_state will have all NaNs
+    # NOTE: if t = 1 then prev_state contains all NaNs
     dist = @trace(normal(dist_mean(prev_state, params, t), params.dist_slack), :dist)
     loc = walk_path(params.path, params.distances_from_start, dist)
     @trace(normal(loc.x, params.noise), :x)
@@ -87,14 +83,13 @@ lightweight_hmm_with_unfold = Unfold(lightweight_hmm_kernel)
     return new_state
 end
 
-# construct a hidden markov model generator
 # args: (num_steps::Int, init_state::KernelState, params::KernelParams)
 static_hmm = Unfold(static_hmm_kernel)
 
 
-####################
-# custom proposals #
-####################
+########################################
+# analytically derived custom proposal #
+########################################
 
 function compute_custom_proposal_params(dt::Float64, prev_dist::Float64, noise::Float64, obs::Point,
                                         posterior_var_d::Float64, posterior_covars::Vector{Matrix{Float64}},
@@ -146,33 +141,52 @@ function compute_custom_proposal_params(dt::Float64, prev_dist::Float64, noise::
 end
 
 
+#####################################
+# show path and observations on top #
+#####################################
 
-#############################
-# define some fixed context #
-#############################
+function render_hmm_trace(start::Point, stop::Point,
+                path::Path,
+                times::Vector{Float64}, speed::Float64,
+                noise::Float64, dist_slack::Float64, trace,
+                get_x::Function, get_y::Function, ax;
+                show_measurements=true,
+                show_start=true, show_stop=true,
+                show_path=true, show_noise=true,
+                start_alpha=1., stop_alpha=1., path_alpha=1.)
 
-function make_scene()
-    scene = Scene(0, 1, 0, 1) 
-    add!(scene, Tree(Point(0.30, 0.20), size=0.1))
-    add!(scene, Tree(Point(0.83, 0.80), size=0.1))
-    add!(scene, Tree(Point(0.80, 0.40), size=0.1))
-    horiz = 1
-    vert = 2
-    wall_height = 0.30
-    wall_thickness = 0.02
-    walls = [
-        Wall(Point(0.20, 0.40), horiz, 0.40, wall_thickness, wall_height)
-        Wall(Point(0.60, 0.40), vert, 0.40, wall_thickness, wall_height)
-        Wall(Point(0.60 - 0.15, 0.80), horiz, 0.15 + wall_thickness, wall_thickness, wall_height)
-        Wall(Point(0.20, 0.80), horiz, 0.15, wall_thickness, wall_height)
-        Wall(Point(0.20, 0.40), vert, 0.40, wall_thickness, wall_height)]
-    for wall in walls
-        add!(scene, wall)
+    # set current axis
+    sca(ax)
+
+    # plot start and stop
+    if show_start
+        scatter([start.x], [start.y], color="blue", s=100, alpha=start_alpha)
     end
-    return scene
+    if show_stop
+        scatter([stop.x], [stop.y], color="red", s=100, alpha=stop_alpha)
+    end
+
+    # plot path lines
+    for i=1:length(path.points)-1
+        prev = path.points[i]
+        next = path.points[i+1]
+        plot([prev.x, next.x], [prev.y, next.y], color="black", alpha=0.5, linewidth=5)
+    end
+
+    # plot measured locations
+    if show_measurements
+        measured_xs = [get_x(trace, i) for i=1:length(times)]
+        measured_ys = [get_y(trace, i) for i=1:length(times)]
+        scatter(measured_xs, measured_ys, marker="x", color="black", alpha=1., s=25)
+    end
 end
 
-const scene = make_scene()
+
+
+######################
+# show prior samples #
+######################
+
 const times = collect(range(0, stop=1, length=20))
 const start_x = 0.1
 const start_y = 0.1
@@ -184,135 +198,11 @@ const dist_slack = 0.2
 const start = Point(start_x, start_y)
 const stop = Point(stop_x, stop_y)
 
-
-####################
-# trace renderings #
-####################
-
-# the only difference between rendering the lightweight and static versions
-# how the locations are extracted from the trace, and the addresses of the
-# measurements.
-
-function render_lightweight_hmm_trace(scene::Scene, start::Point, stop::Point,
-                maybe_path::Nullable{Path},
-                times::Vector{Float64}, speed::Float64,
-                noise::Float64, dist_slack::Float64, trace, ax;
-                show_measurements=true,
-                show_start=true, show_stop=true,
-                show_path=true, show_noise=true,
-                start_alpha=1., stop_alpha=1., path_alpha=1.)
-
-    # set current axis
-    sca(ax)
-
-    # render obstacles
-    render(scene, ax)
-
-    # plot start and stop
-    if show_start
-        scatter([start.x], [start.y], color="blue", s=100, alpha=start_alpha)
-    end
-    if show_stop
-        scatter([stop.x], [stop.y], color="red", s=100, alpha=stop_alpha)
-    end
-
-    # plot path lines
-    if !isnull(maybe_path) && show_path
-        path = get(maybe_path)
-        for i=1:length(path.points)-1
-            prev = path.points[i]
-            next = path.points[i+1]
-            plot([prev.x, next.x], [prev.y, next.y], color="black", alpha=0.5, linewidth=5)
-        end
-    end
-
-    # plot locations with measurement noise around them
-    locations = get_retval(trace)
-    scatter([pt.x for pt in locations], [pt.y for pt in locations],
-        color="orange", alpha=path_alpha, s=25)
-    if show_noise
-        for pt in locations
-            circle = patches[:Circle]((pt.x, pt.y), noise, facecolor="purple", alpha=0.2)
-            ax[:add_patch](circle)
-        end
-    end
-    
-    # plot measured locations
-    assignment = get_choices(trace)
-    if show_measurements
-        measured_xs = [assignment[(:x, i)] for i=1:length(locations)]
-        measured_ys = [assignment[(:y, i)] for i=1:length(locations)]
-        scatter(measured_xs, measured_ys, marker="x", color="black", alpha=1., s=25)
-    end
-end
-
-function render_static_hmm_trace(scene::Scene, start::Point, stop::Point,
-                maybe_path::Nullable{Path},
-                times::Vector{Float64}, speed::Float64,
-                noise::Float64, dist_slack::Float64, trace, ax;
-                show_measurements=true,
-                show_start=true, show_stop=true,
-                show_path=true, show_noise=true,
-                start_alpha=1., stop_alpha=1., path_alpha=1.)
-
-    # set current axis
-    sca(ax)
-
-    # render obstacles
-    render(scene, ax)
-
-    # plot start and stop
-    if show_start
-        scatter([start.x], [start.y], color="blue", s=100, alpha=start_alpha)
-    end
-    if show_stop
-        scatter([stop.x], [stop.y], color="red", s=100, alpha=stop_alpha)
-    end
-
-    # plot path lines
-    if !isnull(maybe_path) && show_path
-        path = get(maybe_path)
-        for i=1:length(path.points)-1
-            prev = path.points[i]
-            next = path.points[i+1]
-            plot([prev.x, next.x], [prev.y, next.y], color="black", alpha=0.5, linewidth=5)
-        end
-    end
-
-    # plot locations with measurement noise around them
-    states = get_retval(trace)
-    locations = Point[state.loc for state in states]
-    scatter([pt.x for pt in locations], [pt.y for pt in locations],
-        color="orange", alpha=path_alpha, s=25)
-    if show_noise
-        for pt in locations
-            circle = patches[:Circle]((pt.x, pt.y), noise, facecolor="purple", alpha=0.2)
-            ax[:add_patch](circle)
-        end
-    end
-    
-    # plot measured locations
-    assignment = get_choices(trace)
-    if show_measurements
-        measured_xs = [assignment[i => :x] for i=1:length(locations)]
-        measured_ys = [assignment[i => :y] for i=1:length(locations)]
-        scatter(measured_xs, measured_ys, marker="x", color="black", alpha=1., s=25)
-    end
-end
-
-
-######################
-# show prior samples #
-######################
+const path = Path(Point(0.1, 0.1), Point(0.5, 0.5), Point[Point(0.1, 0.1), Point(0.0773627, 0.146073), Point(0.167036, 0.655448), Point(0.168662, 0.649074), Point(0.156116, 0.752046), Point(0.104823, 0.838075), Point(0.196407, 0.873581), Point(0.390309, 0.988468), Point(0.408272, 0.91336), Point(0.5, 0.5)])
+const distances_from_start = compute_distances_from_start(path)
 
 function show_prior_samples()
     Random.seed!(0)
-
-    # generate a path
-    maybe_path = plan_path(start, stop, scene, PlannerParams(300, 3.0, 2000, 1.))
-    @assert !isnull(maybe_path)
-    path = get(maybe_path)
-    distances_from_start = compute_distances_from_start(path)
 
     # show samples from the lightweight model
     args = (length(times), path, distances_from_start, times, speed, noise, dist_slack)
@@ -321,7 +211,7 @@ function show_prior_samples()
         subplot(4, 4, i)
         ax = gca()
         trace = simulate(lightweight_hmm, args)
-        render_lightweight_hmm_trace(scene, start, stop, maybe_path, times, speed, noise, dist_slack, trace, ax)
+        render_hmm_trace(start, stop, path, times, speed, noise, dist_slack, trace, (tr, i) -> tr[(:x, i)], (tr, i) -> tr[(:y, i)], ax)
     end
     savefig("lightweight_hmm_prior_samples.png")
 
@@ -333,16 +223,16 @@ function show_prior_samples()
         subplot(4, 4, i)
         ax = gca()
         trace = simulate(static_hmm, (length(times), args...))
-        render_static_hmm_trace(scene, start, stop, maybe_path, times, speed, noise, dist_slack, trace, ax)
+        render_hmm_trace(start, stop, path, times, speed, noise, dist_slack, trace, (tr, i) -> tr[i => :x], (tr, i) -> tr[i => :y], ax)
     end
     savefig("static_hmm_prior_samples.png")
 
 end
 
 
-##################################
-# particle filtering experiments #
-##################################
+###########################################
+# evaluation harness for particle filters #
+###########################################
 
 struct Params
     times::Vector{Float64}
@@ -701,9 +591,7 @@ function experiment()
     Random.seed!(0)
 
     # generate a path
-    maybe_path = plan_path(start, stop, scene, PlannerParams(300, 3.0, 2000, 1.))
-    @assert !isnull(maybe_path)
-    path = get(maybe_path)
+    path = Path(Point(0.1, 0.1), Point(0.5, 0.5), Point[Point(0.1, 0.1), Point(0.0773627, 0.146073), Point(0.167036, 0.655448), Point(0.168662, 0.649074), Point(0.156116, 0.752046), Point(0.104823, 0.838075), Point(0.196407, 0.873581), Point(0.390309, 0.988468), Point(0.408272, 0.91336), Point(0.5, 0.5)])
 
     println("path:")
     println(path)
