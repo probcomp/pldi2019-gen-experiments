@@ -17,7 +17,7 @@ Note that although the dynamics model is linear-Gaussian, the measurement model 
 An example path $p$ is shown as in grey below, and an example data set of $(x_i, y_i)$ pairs are overlaid.
 The first point in the path is highlighted in blue, and the terminal point is shown in red:
 
-![example path and observations](example.png)
+<img src="example.png" alt="example path and observations" width="250">
 
 We evaluate two particle filtering algorithms---one that uses the dynamics as the proposal for each $d_i$ (a *generic* proposal), and one which uses a *custom* proposal that takes the measurement $(x_i, y_i)$ into account when proposing $d_i$.
 The custom proposal requires some manual derivation, and requires more code to implement, but the resulting particle filter is be significantly more efficient than the particle filter with the generic proposal.
