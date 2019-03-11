@@ -69,4 +69,4 @@ def __venture_start__(ripl):
         [t.NumberType()], t.NumberType()))
     ripl.execute_program("define new_trace = proc() { run(new_model()) };")
     ripl.execute_program("define run_in_trace = proc(trace, program) { first(run(in_model(trace, program))) };")
-    ripl.execute_program("define parallel_mapv = proc(f, l) { run(parallel_mapv_action(f, l, 4)) };")
+    ripl.execute_program("define parallel_mapv = proc(f, l) { run(parallel_mapv_action(f, l, 16)) };")
