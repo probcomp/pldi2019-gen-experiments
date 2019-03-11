@@ -1,17 +1,15 @@
 import Gen
 using Gen: @gen, @trace, normal, Unfold, logsumexp, simulate, choicemap, initialize_particle_filter, maybe_resample!, UnknownChange, NoChange, particle_filter_step!, log_ml_estimate, call_at, get_choices, categorical
-using Turing
 using PyPlot
 using Printf: @sprintf
 import Random
 import Distributions
 using Statistics: median, mean
-using JLD
 
 const patches = PyPlot.matplotlib[:patches]
 
 include("piecewise_normal.jl")
-include("geometry.jl")
+include("../geometry.jl")
 
 const times = collect(range(0, stop=1, length=20))
 const start_x = 0.1
@@ -79,7 +77,7 @@ function evaluate_particle_filter(pf::Function, params::Params,
     noise = params.noise
     path = params.path
 
-    results = Dict{Int, Tuple{Vector{Float64},Vector{Float64}}}()
+    results = Dict()
     for num_particles in num_particles_list
         ess_threshold = num_particles / 2
         elapsed = Vector{Float64}(undef, num_reps)
@@ -94,7 +92,7 @@ function evaluate_particle_filter(pf::Function, params::Params,
             elapsed[rep] = Int(time_ns() - start) / 1e9
             lmls[rep] = lml
         end
-        results[num_particles] = (lmls, elapsed)
+        results[num_particles] = Dict("lmls" => lmls, "elapsed" => elapsed)
     end
     return results
 end
@@ -310,7 +308,8 @@ end
 
 function static_default_proposal_pf(measured_xs, measured_ys,
             num_particles, precomputed, path, times, speed, noise, dist_slack)
-    ess_threshold = num_particles / 2
+    #ess_threshold = num_particles / 2
+    ess_threshold = 0 # TODO always resample, like the Venture implementation
     init_obs = choicemap()
     init_obs[1 => :x] = measured_xs[1]
     init_obs[1 => :y] = measured_ys[1]
@@ -320,6 +319,7 @@ function static_default_proposal_pf(measured_xs, measured_ys,
     args = (1, KernelState(NaN, Point(NaN, NaN)), kernel_params)
     state = initialize_particle_filter(static_hmm, args, init_obs, num_particles)
     for step=2:length(measured_xs)
+        println(state.log_weights)
         maybe_resample!(state, ess_threshold=ess_threshold, verbose=true)
         args = (step, KernelState(NaN, Point(NaN, NaN)), kernel_params)
         argdiffs = (UnknownChange(), NoChange(), NoChange())
@@ -580,45 +580,6 @@ function lightweight_unfold_custom_proposal_pf(measured_xs, measured_ys,
     return lml
 end
 
-##############
-# Turing SMC #
-##############
-
-@model turing_model(x_obs, y_obs, path, distances_from_start, times, speed, noise, dist_slack) = begin
-    steps = length(x_obs)
-    
-    # walk path
-    locations = Vector{Point}(undef, steps)
-    dists = Vector{Float64}(undef,steps)
-    dists[1] ~ Normal(speed * times[1], dist_slack)
-    locations[1] = walk_path(path, distances_from_start, dists[1])
-    for t=2:steps
-        dists[t] ~ Normal(dists[t-1] + speed * (times[t] - times[t-1]), dist_slack)
-        locations[t] = walk_path(path, distances_from_start, dists[t])
-    end
-
-    # generate noisy observations
-    for t=1:steps
-        point = locations[t]
-        x_obs[t] ~ Normal(point.x, noise)
-        y_obs[t] ~ Normal(point.y, noise)
-    end
-
-    return locations
-end
-
-function turing_pf(measured_xs, measured_ys, num_particles, precomputed, path, times, speed, noise, dist_slack)
-    spl = Turing.Sampler(Turing.SMC(num_particles, Turing.resample_multinomial, 0.5, Set(), 0))
-    particles = Turing.ParticleContainer{Turing.Trace}(turing_model(measured_xs, measured_ys, path, precomputed.distances_from_start, times, speed, noise, dist_slack))
-    push!(particles, spl.alg.n_particles, spl, Turing.VarInfo())
-    while Libtask.consume(particles) != Val{:done}
-      ess = Turing.effectiveSampleSize(particles)
-      if ess <= spl.alg.resampler_threshold * length(particles)
-        Turing.resample!(particles,spl.alg.resampler)
-      end
-    end
-    return particles.logE
-end
 
 ###################
 # run experiments #
@@ -628,6 +589,13 @@ function plot_results(results::Dict, num_particles_list::Vector{Int}, label::Str
     median_elapsed = [median(results[num_particles][2]) for num_particles in num_particles_list]
     mean_lmls = [mean(results[num_particles][1]) for num_particles in num_particles_list]
     plot(median_elapsed, mean_lmls, label=label, color=color)
+end
+
+import JSON
+function write_json_results(results, fname::AbstractString)
+    open(fname,"w") do f
+        JSON.print(f, results, 4)
+    end
 end
 
 function experiment()
@@ -644,36 +612,31 @@ function experiment()
     num_particles_list = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 200, 300]
     num_reps = 50
 
-    # experiments with Turing
-    results_turing = evaluate_particle_filter(turing_pf,
-        params, measured_xs, measured_ys, num_particles_list, num_reps)
-
     # experiments with static model
-    results_static_default_proposal = evaluate_particle_filter(static_default_proposal_pf,
-        params, measured_xs, measured_ys, num_particles_list, num_reps)
-    results_static_custom_proposal = evaluate_particle_filter(static_unfold_custom_proposal_pf,
-        params, measured_xs, measured_ys, num_particles_list, num_reps)
+    write_json_results(
+        evaluate_particle_filter(static_default_proposal_pf, params, measured_xs, measured_ys, num_particles_list, num_reps),
+        "gen_results_static_default_proposal.json")
+
+    write_json_results(evaluate_particle_filter(static_unfold_custom_proposal_pf, params, measured_xs, measured_ys, num_particles_list, num_reps),
+        "gen_results_static_custom_proposal.json")
 
     # experiments with lightweight model (no unfold)
-    results_lightweight_default_proposal = evaluate_particle_filter(lightweight_default_proposal_pf,
-        params, measured_xs, measured_ys, num_particles_list, num_reps)
-    results_lightweight_custom_proposal = evaluate_particle_filter(lightweight_custom_proposal_pf,
-        params, measured_xs, measured_ys, num_particles_list, num_reps)
+    write_json_results(
+        evaluate_particle_filter(lightweight_default_proposal_pf, params, measured_xs, measured_ys, num_particles_list, num_reps),
+        "gen_results_lightweight_default_proposal.json")
+
+    write_json_results(
+        evaluate_particle_filter(lightweight_custom_proposal_pf, params, measured_xs, measured_ys, num_particles_list, num_reps),
+        "gen_results_lightweight_custom_proposal.json")
 
     # experiments with unfold
-    results_lightweight_unfold_default_proposal = evaluate_particle_filter(lightweight_unfold_default_proposal_pf,
-        params, measured_xs, measured_ys, num_particles_list, num_reps)
-    results_lightweight_unfold_custom_proposal = evaluate_particle_filter(lightweight_unfold_custom_proposal_pf,
-        params, measured_xs, measured_ys, num_particles_list, num_reps)
+    write_json_results(
+        evaluate_particle_filter(lightweight_unfold_default_proposal_pf, params, measured_xs, measured_ys, num_particles_list, num_reps),
+        "gen_results_lightweight_unfold_default_proposal.json")
 
-    save("results.jld",
-        "results_turing", results_turing,
-        "results_static_default_proposal", results_static_default_proposal,
-        "results_static_custom_proposal", results_static_custom_proposal,
-        "results_lightweight_default_proposal", results_lightweight_default_proposal,
-        "results_lightweight_custom_proposal", results_lightweight_custom_proposal,
-        "results_lightweight_unfold_default_proposal", results_lightweight_unfold_default_proposal,
-        "results_lightweight_unfold_custom_proposal", results_lightweight_unfold_custom_proposal)
+    write_json_results(
+        evaluate_particle_filter(lightweight_unfold_custom_proposal_pf, params, measured_xs, measured_ys, num_particles_list, num_reps),
+        "gen_results_lightweight_unfold_custom_proposal.json")
 end
 
 # NOTE: you have to separate static gen function definitions from calling API
