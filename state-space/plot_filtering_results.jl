@@ -27,7 +27,7 @@ function plot_results(num_particles_list::Vector{Int}, results::Dict, label::Str
         linestyle=linestyle)
 end
 
-anglican_results = JSON.parsefile("anglican-filtering/anglican-results.json") # TODO this is for the wrong HMM.
+anglican_results = JSON.parsefile("anglican-filtering/anglican-results.json")
 venture_results = JSON.parsefile("venture/venture_results.json")
 turing_results = JSON.parsefile("turing/turing_results.json")
 gen_results_static_default_proposal = JSON.parsefile("gen/gen_results_static_default_proposal.json")
