@@ -5,7 +5,9 @@ using DataFrames
 # rendering #
 #############
 
-using PyPlot
+using PyCall
+@pyimport matplotlib.pyplot as plt
+
 const POINT_SIZE = 10
 
 function render_dataset(x::Vector{Float64}, y::Vector{Float64}, xlim, ylim)
@@ -61,15 +63,15 @@ elapsed2, scores2 = (df[:elapsed], df[:scores])
 df = DataFrame(CSV.File("example-data-prog2.csv"))
 elapsed3, scores3 = (df[:elapsed], df[:scores])
 
-figure(figsize=(6,3))
-plot(elapsed1[2:end], scores1[2:end], color="blue", label="Inference Program 1")
-plot(elapsed3[2:end], scores3[2:end], color="green", label="Inference Program 2")
-plot(elapsed2[2:end], scores2[2:end], color="orange", label="Inference Program 3")
-legend(loc="lower right")
-ylabel("Log Probability")
-xlabel("Runtime (seconds)")
-gca()[:set_xlim]((0, 2))
-tight_layout()
-fig = gcf()
-fig[:set_size_inches]((7, 2.5))
-savefig("scores.pdf")
+plt.figure()
+plt.plot(elapsed1[2:end], scores1[2:end], color="blue", label="Inference Program 1")
+plt.plot(elapsed3[2:end], scores3[2:end], color="green", label="Inference Program 2")
+plt.plot(elapsed2[2:end], scores2[2:end], color="orange", label="Inference Program 3")
+plt.legend(loc="lower right")
+plt.ylabel("Log Probability")
+plt.xlabel("Runtime (seconds)")
+plt.gca()[:set_xlim]((0, 2))
+fig = plt.gcf()
+fig[:set_size_inches]((5, 2))
+fig[:tight_layout](pad=0)
+plt.savefig("scores.pdf")
