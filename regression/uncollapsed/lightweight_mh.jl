@@ -4,9 +4,6 @@ include("../shared.jl")
 # model #
 #########
 
-# This is a higher-order Gen function returning a new gen function which is
-# multiple independent applications.
-
 @gen function model(xs::Vector{Float64})
     inlier_std = @trace(normal(0, 2), :inlier_std)
     outlier_std = @trace(normal(0, 2), :outlier_std)
