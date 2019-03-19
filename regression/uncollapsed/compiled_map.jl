@@ -54,8 +54,6 @@ function do_inference(n)
     # initial trace
     (trace, _) = generate(model, (xs,), observations)
 
-    scores = Vector{Float64}(undef, n)
-
     runtime = 0
     for i=1:n
 
