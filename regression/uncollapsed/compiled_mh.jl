@@ -53,17 +53,6 @@ end
     @trace(normal(outlier_std, .5), :outlier_std)
 end
 
-# @gen (static) function flip_z(z::Bool)
-#     @trace(bernoulli(z ? 0.0 : 1.0), :z)
-# end
-
-# data_proposal = at_dynamic(flip_z, Int)
-
-# @gen (static) function is_outlier_proposal(prev, i::Int)
-#     prev_z::Bool = get_assignment(prev)[:data => i => :z]
-#     @trace(data_proposal(i, (prev_z,)), :data)
-# end
-
 @gen (static) function is_outlier_proposal(prev, i::Int)
     prev_z = prev[:data => i => :z]
     @trace(bernoulli(prev_z ? 0.0 : 1.0), :data => i => :z)
@@ -107,7 +96,6 @@ function do_inference(n)
 
         # report loop stats
         score = get_score(trace)
-        # assignment = get_choices(trace)
         println((score,
             trace[:slope],
             trace[:intercept],
@@ -116,7 +104,6 @@ function do_inference(n)
     end
 
     score = get_score(trace)
-    # trace = get_choices(trace)
     return (
         n,
         runtime,
