@@ -1,5 +1,42 @@
-include("model.jl")
+using Gen
+import Random
+using DataFrames
+using CSV
 
+#########
+# model #
+#########
+
+struct Params
+    prob_outlier::Float64
+    slope::Float64
+    intercept::Float64
+    noise::Float64
+end
+
+const OUTLIER_STD = 10.
+
+@gen (grad) function datum(x, prob_outlier, (grad)(slope), (grad)(intercept), noise)::Float64
+    if @trace(bernoulli(prob_outlier), :z)
+        (mu, std) = (0., OUTLIER_STD)
+    else
+        (mu, std) = (x * slope + intercept, noise)
+    end
+    return @trace(normal(mu, std), :y)
+end
+
+data = Map(datum)
+
+@gen (grad, static) function model(xs::Vector{Float64})
+    prob_outlier = @trace(uniform(0, 0.5), :prob_outlier)
+    noise = @trace(gamma(1, 1), :noise)
+    slope = @trace(normal(0, 2), :slope)
+    intercept = @trace(normal(0, 2), :intercept)
+    params = Params(prob_outlier, slope, intercept, noise)
+    n = length(xs)
+    ys = @trace(data(xs, fill(prob_outlier, n), fill(slope, n), fill(intercept, n), fill(noise, n)), :data)
+    return ys
+end
 ##########
 # RANSAC #
 ##########
@@ -387,16 +424,3 @@ df = DataFrame()
 df[:elapsed] = elapsed3
 df[:scores] = scores3
 CSV.write("example-data-prog2.csv", df)
-
-# make the plot
-
-figure(figsize=(4,3))
-plot(elapsed1[2:2:end], scores1[2:2:end], color="blue", label="Inference Program 1")
-plot(elapsed3[2:end], scores3[2:end], color="green", label="Inference Program 2")
-plot(elapsed2[2:end], scores2[2:end], color="orange", label="Inference Program 3")
-legend(loc="lower right")
-ylabel("Log Probability")
-xlabel("seconds")
-gca()[:set_xlim]((0, 3))
-tight_layout()
-savefig("scores.pdf")

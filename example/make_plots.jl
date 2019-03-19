@@ -1,42 +1,5 @@
-using Gen
-import Random
-using DataFrames
 using CSV
-
-#########
-# model #
-#########
-
-struct Params
-    prob_outlier::Float64
-    slope::Float64
-    intercept::Float64
-    noise::Float64
-end
-
-const OUTLIER_STD = 10.
-
-@gen (grad) function datum(x, prob_outlier, (grad)(slope), (grad)(intercept), noise)::Float64
-    if @trace(bernoulli(prob_outlier), :z)
-        (mu, std) = (0., OUTLIER_STD)
-    else
-        (mu, std) = (x * slope + intercept, noise)
-    end
-    return @trace(normal(mu, std), :y)
-end
-
-data = Map(datum)
-
-@gen (grad, static) function model(xs::Vector{Float64})
-    prob_outlier = @trace(uniform(0, 0.5), :prob_outlier)
-    noise = @trace(gamma(1, 1), :noise)
-    slope = @trace(normal(0, 2), :slope)
-    intercept = @trace(normal(0, 2), :intercept)
-    params = Params(prob_outlier, slope, intercept, noise)
-    n = length(xs)
-    ys = @trace(data(xs, fill(prob_outlier, n), fill(slope, n), fill(intercept, n), fill(noise, n)), :data)
-    return ys
-end
+using DataFrames
 
 #############
 # rendering #
@@ -86,3 +49,27 @@ function render_linreg(trace, xlim, ylim; line_alpha=1.0, point_alpha=1.0, show_
     ax[:set_xlim](xlim)
     ax[:set_ylim](ylim)
 end
+
+# make the plot
+
+df = DataFrame(CSV.File("example-data-prog1.csv"))
+elapsed1, scores1 = (df[:elapsed], df[:scores])
+
+df = DataFrame(CSV.File("example-data-prog3.csv"))
+elapsed2, scores2 = (df[:elapsed], df[:scores])
+
+df = DataFrame(CSV.File("example-data-prog2.csv"))
+elapsed3, scores3 = (df[:elapsed], df[:scores])
+
+figure(figsize=(6,3))
+plot(elapsed1[2:end], scores1[2:end], color="blue", label="Inference Program 1")
+plot(elapsed3[2:end], scores3[2:end], color="green", label="Inference Program 2")
+plot(elapsed2[2:end], scores2[2:end], color="orange", label="Inference Program 3")
+legend(loc="lower right")
+ylabel("Log Probability")
+xlabel("Runtime (seconds)")
+gca()[:set_xlim]((0, 2))
+tight_layout()
+fig = gcf()
+fig[:set_size_inches]((7, 2.5))
+savefig("scores.pdf")
