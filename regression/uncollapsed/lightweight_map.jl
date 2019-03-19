@@ -4,39 +4,19 @@ include("../shared.jl")
 # model #
 #########
 
-@gen function datum(x::Float64,
-        @ad(inlier_std), @ad(outlier_std), @ad(slope), @ad(intercept))
-    is_outlier = @addr(bernoulli(0.5), :z)
-    std = is_outlier ? inlier_std : outlier_std
-    y = @addr(normal(x * slope + intercept, sqrt(exp(std))), :y)
-    return y
-end
-
-data = plate(datum)
-
 @gen function model(xs::Vector{Float64})
-    n = length(xs)
-    inlier_std = @addr(normal(0, 2), :inlier_std)
-    outlier_std = @addr(normal(0, 2), :outlier_std)
-    slope = @addr(normal(0, 2), :slope)
-    intercept = @addr(normal(0, 2), :intercept)
-    @diff begin
-        argdiff = noargdiff
-        for addr in [:slope, :intercept, :inlier_std, :outlier_std]
-            if !isnodiff(@choicediff(addr))
-                argdiff = unknownargdiff
-            end
-        end
+    inlier_std = @trace(normal(0, 2), :inlier_std)
+    outlier_std = @trace(normal(0, 2), :outlier_std)
+    slope = @trace(normal(0, 2), :slope)
+    intercept = @trace(normal(0, 2), :intercept)
+    ys = Float64[]
+    for (i, x) in enumerate(xs)
+        is_outlier = @trace(bernoulli(.5), :data => i => :z)
+        std = is_outlier ? inlier_std : outlier_std
+        mean = x * slope + intercept
+        y = @trace(normal(mean, sqrt(exp(std))), :data => i => :y)
+        push!(ys, y)
     end
-    ys = @addr(
-            data(
-                xs,
-                fill(inlier_std, n),
-                fill(outlier_std, n),
-                fill(slope, n),
-                fill(intercept, n)),
-            :data,
-            argdiff)
     return ys
 end
 
@@ -45,33 +25,20 @@ end
 #######################
 
 @gen function is_outlier_proposal(prev, i::Int)
-    prev = get_assignment(prev)[:data => i => :z]
-    @addr(bernoulli(prev ? 0.0 : 1.0), :data => i => :z)
+    z = prev[:data => i => :z]
+    @trace(bernoulli(z ? 0.0 : 1.0), :data => i => :z)
 end
-
-@gen function observer(ys::Vector{Float64})
-    for (i, y) in enumerate(ys)
-        @addr(dirac(y), :data => i => :y)
-    end
-end
-
-Gen.load_generated_functions()
 
 ##################
 # run experiment #
 ##################
 
-selection = DynamicAddressSet()
-push!(selection, :slope)
-push!(selection, :intercept)
-push!(selection, :inlier_std)
-push!(selection, :outlier_std)
-
 function do_inference(n)
-
-    # prepare dataset
-    xs, ys = load_dataset("../train.csv")
-    observations = get_assignment(simulate(observer, (ys,)))
+    (xs, ys) = load_dataset("../train.csv")
+    observations = choicemap()
+    for (i, y) in enumerate(ys)
+        observations[:data => i => :y] = y
+    end
 
     # initial trace
     (trace, _) = generate(model, (xs,), observations)
@@ -85,38 +52,41 @@ function do_inference(n)
         # 1. Use adaptive gradients 1e-1 to 1e-10
         # 2. Make selection for slope/intercept and inlier_std/outlier_std.
         # 3. Make 10 steps instead of 1 step.
-        trace = map_optimize(model, selection,
-            trace, max_step_size=1e-6, min_step_size=1e-6)
+        trace = map_optimize(trace,
+            select(:slope, :intercept, :inlier_std, :outlier_std),
+            max_step_size=1e-6, min_step_size=1e-6)
 
         # step on the outliers
         for j=1:length(xs)
-            trace = mh(model, is_outlier_proposal, (j,), trace)
+            (trace, _accept) = mh(trace, is_outlier_proposal, (j,))
         end
         elapsed = time() - start
         runtime += elapsed
 
         # report loop stats
-        score = get_call_record(trace).score
-        assignment = get_assignment(trace)
+        score = get_score(trace)
         println((i, score,
-            assignment[:slope],
-            assignment[:intercept],
-            sqrt(exp(assignment[:inlier_std])),
-            sqrt(exp(assignment[:outlier_std]))))
+            trace[:slope],
+            trace[:intercept],
+            sqrt(exp(trace[:inlier_std])),
+            sqrt(exp(trace[:outlier_std]))))
     end
 
-    assignment = get_assignment(trace)
-    score = get_call_record(trace).score
+    score = get_score(trace)
     return (
         n,
         runtime,
         score,
-        assignment[:slope],
-        assignment[:intercept],
-        assignment[:inlier_std],
-        assignment[:outlier_std],
+        trace[:slope],
+        trace[:intercept],
+        trace[:inlier_std],
+        trace[:outlier_std],
     )
 end
+
+#################
+# run inference #
+#################
 
 do_inference(10)
 
