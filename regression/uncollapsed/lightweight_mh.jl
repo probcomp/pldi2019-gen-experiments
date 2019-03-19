@@ -4,73 +4,52 @@ include("../shared.jl")
 # model #
 #########
 
-@gen function datum(x::Float64, params::Params)
-    is_outlier = @addr(bernoulli(params.prob_outlier), :z)
-    std = is_outlier ? params.inlier_std : params.outlier_std
-    y = @addr(normal(x * params.slope + params.intercept, sqrt(exp(std))), :y)
-    return y
-end
-
 # This is a higher-order Gen function returning a new gen function which is
 # multiple independent applications.
-data = plate(datum)
 
 @gen function model(xs::Vector{Float64})
-    inlier_std = @addr(normal(0, 2), :inlier_std)
-    outlier_std = @addr(normal(0, 2), :outlier_std)
-    slope = @addr(normal(0, 2), :slope)
-    intercept = @addr(normal(0, 2), :intercept)
-    params = Params(0.5, inlier_std, outlier_std, slope, intercept)
-    @diff begin
-        argdiff = noargdiff
-        for addr in [:slope, :intercept, :inlier_std, :outlier_std]
-            if !isnodiff(@choicediff(addr))
-                argdiff = unknownargdiff
-            end
-        end
+    inlier_std = @trace(normal(0, 2), :inlier_std)
+    outlier_std = @trace(normal(0, 2), :outlier_std)
+    slope = @trace(normal(0, 2), :slope)
+    intercept = @trace(normal(0, 2), :intercept)
+    ys = Float64[]
+    for (i, x) in enumerate(xs)
+        is_outlier = @trace(bernoulli(.5), :data => i => :z)
+        std = is_outlier ? inlier_std : outlier_std
+        mean = x * slope + intercept
+        y = @trace(normal(mean, sqrt(exp(std))), :data => i => :y)
+        push!(ys, y)
     end
-    ys = @addr(data(xs, fill(params, length(xs))), :data, argdiff)
     return ys
 end
-
-# Three options for @choicediff
-# Check lightweight/update.jl
-# 1. isnodiff
-# 2. isnewdiff
-# 3. prev
-# Also check plate/update.jl for the plate-specific implementations.
-# You cannot use :z since that address is not owned by @gen model.
-# This whole thing is to ensure that when a Bernoulli choice is switched
-# only visit the single data point corresponding to the flipped outlier
-# indicator.
 
 #######################
 # inference operators #
 #######################
 
 @gen function slope_proposal(prev)
-    slope = get_assignment(prev)[:slope]
-    @addr(normal(slope, 0.5), :slope)
+    slope = prev[:slope]
+    @trace(normal(slope, 0.5), :slope)
 end
 
 @gen function intercept_proposal(prev)
-    intercept = get_assignment(prev)[:intercept]
-    @addr(normal(intercept, 0.5), :intercept)
+    intercept = prev[:intercept]
+    @trace(normal(intercept, 0.5), :intercept)
 end
 
 @gen function inlier_std_proposal(prev)
-    inlier_std = get_assignment(prev)[:inlier_std]
-    @addr(normal(inlier_std, 0.5), :inlier_std)
+    inlier_std = prev[:inlier_std]
+    @trace(normal(inlier_std, 0.5), :inlier_std)
 end
 
 @gen function outlier_std_proposal(prev)
-    outlier_std = get_assignment(prev)[:outlier_std]
-    @addr(normal(outlier_std, 0.5), :outlier_std)
+    outlier_std = prev[:outlier_std]
+    @trace(normal(outlier_std, 0.5), :outlier_std)
 end
 
 @gen function is_outlier_proposal(prev, i::Int)
-    prev = get_assignment(prev)[:data => i => :z]
-    @addr(bernoulli(prev ? 0.0 : 1.0), :data => i => :z)
+    z = prev[:data => i => :z]
+    @trace(bernoulli(z ? 0.0 : 1.0), :data => i => :z)
 end
 
 ##################
@@ -81,7 +60,7 @@ function do_inference(n)
 
     # prepare dataset
     xs, ys = load_dataset("../train.csv")
-    observations = DynamicAssignment()
+    observations = choicemap()
     for (i, y) in enumerate(ys)
         observations[:data => i => :y] = y
     end
@@ -94,40 +73,38 @@ function do_inference(n)
 
         start = time()
         # steps on the parameters
-        trace = mh(model, slope_proposal, (), trace)
-        trace = mh(model, intercept_proposal, (), trace)
-        trace = mh(model, inlier_std_proposal, (), trace)
-        trace = mh(model, outlier_std_proposal, (), trace)
+        (trace, _accept) = mh(trace, slope_proposal, ())
+        (trace, _accept) = mh(trace, intercept_proposal, ())
+        (trace, _accept) = mh(trace, inlier_std_proposal, ())
+        (trace, _accept) = mh(trace, outlier_std_proposal, ())
 
         # step on the outliers
         for j=1:length(xs)
-            trace = mh(model, is_outlier_proposal, (j,), trace)
+            (trace, _bool) = mh(trace, is_outlier_proposal, (j,))
         end
         elapsed = time() - start
         runtime += elapsed
 
         # report loop stats
-        assignment = get_assignment(trace)
-        score = get_call_record(trace).score
+        score = get_score(trace)
         println((
             score,
-            assignment[:slope],
-            assignment[:intercept],
-            sqrt(exp(assignment[:inlier_std])),
-            sqrt(exp(assignment[:outlier_std]))),
+            trace[:slope],
+            trace[:intercept],
+            sqrt(exp(trace[:inlier_std])),
+            sqrt(exp(trace[:outlier_std]))),
         )
     end
 
-    assignment = get_assignment(trace)
-    score = get_call_record(trace).score
+    score = get_score(trace)
     return (
         n,
         runtime,
         score,
-        assignment[:slope],
-        assignment[:intercept],
-        assignment[:inlier_std],
-        assignment[:outlier_std])
+        trace[:slope],
+        trace[:intercept],
+        trace[:inlier_std],
+        trace[:outlier_std])
 end
 
 #################
