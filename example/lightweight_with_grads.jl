@@ -42,10 +42,10 @@ function ransac(xs::Vector{Float64}, ys::Vector{Float64}, params::RANSACParams)
         A = hcat(subset_xs, ones(length(subset_xs)))
         slope, intercept = A\subset_ys
         
-        ypred = intercept + slope * xs
+        ypred = intercept .+ slope * xs
 
         # count the number of inliers for this (slope, intercept) hypothesis
-        inliers = abs.(ys - ypred) .< params.eps
+        inliers = abs.(ys .- ypred) .< params.eps
         num_inliers = sum(inliers)
 
         if num_inliers > best_num_inliers
@@ -64,36 +64,36 @@ end
 #######################
 
 @gen function slope_proposal(prev)
-    slope = get_assignment(prev)[:slope]
-    @addr(normal(slope, 0.2), :slope)
+    slope = get_choices(prev)[:slope]
+    @trace(normal(slope, 0.2), :slope)
 end
 
 @gen function intercept_proposal(prev)
-    intercept = get_assignment(prev)[:intercept]
-    @addr(normal(intercept, 0.2), :intercept)
+    intercept = get_choices(prev)[:intercept]
+    @trace(normal(intercept, 0.2), :intercept)
 end
 
 @gen function noise_proposal(prev)
-    noise = get_assignment(prev)[:noise]
-    @addr(gamma(1, 1), :noise)
+    noise = get_choices(prev)[:noise]
+    @trace(gamma(1, 1), :noise)
 end
 
 @gen function prob_outlier_proposal(prev)
-    @addr(uniform(0, 0.5), :prob_outlier)
+    @trace(uniform(0, 0.5), :prob_outlier)
 end
 
 @gen function is_outlier_proposal(prev, i::Int)
-    prev = get_assignment(prev)[:data => i => :z]
-    @addr(bernoulli(prev ? 0.0 : 1.0), :data => i => :z)
+    prev = get_choices(prev)[:data => i => :z]
+    @trace(bernoulli(prev ? 0.0 : 1.0), :data => i => :z)
 end
 
 @gen function joint_proposal(prev)
-    slope = get_assignment(prev)[:slope]
-    intercept = get_assignment(prev)[:intercept]
-    @addr(normal(slope, 0.2), :slope)
-    @addr(normal(intercept, 0.2), :intercept)
-    @addr(gamma(1, 1), :noise)
-    @addr(uniform(0, 1), :prob_outlier)
+    slope = get_choices(prev)[:slope]
+    intercept = get_choices(prev)[:intercept]
+    @trace(normal(slope, 0.2), :slope)
+    @trace(normal(intercept, 0.2), :intercept)
+    @trace(gamma(1, 1), :noise)
+    @trace(uniform(0, 1), :prob_outlier)
 end
 
 #####################
@@ -126,8 +126,8 @@ ys[end-5] = 13
 ######################
 
 function print_trace(trace)
-    score = get_call_record(trace).score
-    assignment = get_assignment(trace)
+    score = get_score(trace)
+    assignment = get_choices(trace)
     prob_outlier = assignment[:prob_outlier]
     slope = assignment[:slope]
     intercept = assignment[:intercept]
@@ -145,7 +145,7 @@ function do_gradient_inference(n)
     elapsed = Vector{Float64}(undef, n+1)
     start = time_sec()
 
-    constraints = DynamicAssignment()
+    constraints = choicemap()
     for (i, y) in enumerate(ys)
         constraints[:data => i => :y] = y
     end
@@ -153,7 +153,7 @@ function do_gradient_inference(n)
     # initial trace
     (trace, _) = generate(model, (xs,), constraints)
     elapsed[1] = elapsed_sec(start)
-    scores[1] = get_call_record(trace).score
+    scores[1] = get_score(trace)
     print_trace(trace)
     init_trace = trace
 
@@ -163,19 +163,19 @@ function do_gradient_inference(n)
 
         # steps on the parameters
         for j=1:5
-            trace = mh(model, prob_outlier_proposal, (), trace)
-            trace = mh(model, noise_proposal, (), trace)
-            trace = mala(model, selection, trace, 0.001)
+            trace, = mh(trace, prob_outlier_proposal, ())
+            trace, = mh(trace, noise_proposal, ())
+            trace, = mala(trace, selection, 0.001)
         end
 
         # step on the outliers
         for j=1:length(xs)
-            trace = mh(model, is_outlier_proposal, (j,), trace)
+            trace, = mh(trace, is_outlier_proposal, (j,))
         end
 
         print_trace(trace)
         elapsed[i+1] = elapsed_sec(start)
-        scores[i+1] = get_call_record(trace).score
+        scores[i+1] = get_score(trace)
     end
     return (init_trace, trace, elapsed, scores)
 
@@ -183,8 +183,8 @@ end
 
 @gen function ransac_proposal(prev_trace, xs, ys)
     (slope, intercept) = ransac(xs, ys, RANSACParams(10, 3, 1.))
-    @addr(normal(slope, 0.1), :slope)
-    @addr(normal(intercept, 1.0), :intercept)
+    @trace(normal(slope, 0.1), :slope)
+    @trace(normal(intercept, 1.0), :intercept)
 end
 
 function do_ransac_inference(n)
@@ -193,7 +193,7 @@ function do_ransac_inference(n)
     elapsed = Vector{Float64}(undef, n+1)
     start = time_sec()
 
-    constraints = DynamicAssignment()
+    constraints = choicemap()
     for (i, y) in enumerate(ys)
         constraints[:data => i => :y] = y
     end
@@ -201,7 +201,7 @@ function do_ransac_inference(n)
     # initial trace
     (trace, _) = generate(model, (xs,), constraints)
     elapsed[1] = elapsed_sec(start)
-    scores[1] = get_call_record(trace).score
+    scores[1] = get_score(trace)
     print_trace(trace)
     init_trace = trace
 
@@ -211,23 +211,23 @@ function do_ransac_inference(n)
 
     for i=1:n
 
-        trace = mh(model, ransac_proposal, (xs, ys), trace; verbose=true)
+        trace, = mh(trace, ransac_proposal, (xs, ys))
 
         # steps on the parameters
         for j=1:5
-            trace = mh(model, prob_outlier_proposal, (), trace)
-            trace = mh(model, noise_proposal, (), trace)
-            trace = mala(model, selection, trace, 0.001)
+            trace, = mh(trace, prob_outlier_proposal, ())
+            trace, = mh(trace, noise_proposal, ())
+            trace, = mala(trace, selection, 0.001)
         end
 
         # step on the outliers
         for j=1:length(xs)
-            trace = mh(model, is_outlier_proposal, (j,), trace)
+            trace, = mh(trace, is_outlier_proposal, (j,))
         end
 
         print_trace(trace)
         elapsed[i+1] = elapsed_sec(start)
-        scores[i+1] = get_call_record(trace).score
+        scores[i+1] = get_score(trace)
     end
     return (init_trace, trace, elapsed, scores)
 
@@ -240,7 +240,7 @@ function do_generic_inference(n)
     elapsed = Vector{Float64}(undef, n+1)
     start = time_sec()
 
-    constraints = DynamicAssignment()
+    constraints = choicemap()
     for (i, y) in enumerate(ys)
         constraints[:data => i => :y] = y
     end
@@ -248,23 +248,23 @@ function do_generic_inference(n)
     # initial trace
     (trace, _) = generate(model, (xs,), constraints)
     elapsed[1] = elapsed_sec(start)
-    scores[1] = get_call_record(trace).score
+    scores[1] = get_score(trace)
     print_trace(trace)
     init_trace = trace
 
     selection = Gen.select(:noise, :prob_outlier, :slope, :intercept)
     for i=1:n
 
-        trace = mh(model, selection, trace; verbose=true)
+        trace, = mh(trace, selection)
 
         # step on the outliers
         for j=1:length(xs)
-            trace = mh(model, is_outlier_proposal, (j,), trace)
+            trace, = mh(trace, is_outlier_proposal, (j,))
         end
 
         print_trace(trace)
         elapsed[i+1] = elapsed_sec(start)
-        scores[i+1] = get_call_record(trace).score
+        scores[i+1] = get_score(trace)
     end
     return (init_trace, trace, elapsed, scores)
 
@@ -276,7 +276,7 @@ function do_inference(n)
     elapsed = Vector{Float64}(undef, n+1)
     start = time_sec()
 
-    constraints = DynamicAssignment()
+    constraints = choicemap()
     for (i, y) in enumerate(ys)
         constraints[:data => i => :y] = y
     end
@@ -292,7 +292,7 @@ function do_inference(n)
     # initial trace
     (trace, _) = generate(model, (xs,), constraints)
     elapsed[1] = elapsed_sec(start)
-    scores[1] = get_call_record(trace).score
+    scores[1] = get_score(trace)
     print_trace(trace)
     init_trace = trace
 
@@ -300,23 +300,25 @@ function do_inference(n)
 
         # steps on the parameters
         for j=1:5
-            trace = mh(model, prob_outlier_proposal, (), trace)
-            trace = mh(model, noise_proposal, (), trace)
-            trace = mh(model, slope_proposal, (), trace)
-            trace = mh(model, intercept_proposal, (), trace)
+            trace, = mh(trace, prob_outlier_proposal, ())
+            trace, = mh(trace, noise_proposal, ())
+            trace, = mh(trace, slope_proposal, ())
+            trace, = mh(trace, intercept_proposal, ())
         end
 
         # step on the outliers
         for j=1:length(xs)
-            trace = mh(model, is_outlier_proposal, (j,), trace)
+            trace, = mh(trace, is_outlier_proposal, (j,))
         end
 
         print_trace(trace)
         elapsed[i+1] = elapsed_sec(start)
-        scores[i+1] = get_call_record(trace).score
+        scores[i+1] = get_score(trace)
     end
     return (init_trace, trace, elapsed, scores)
 end
+
+Gen.load_generated_functions()
 
 # precompile
 (init_trace, trace, elapsed1, scores1) = do_generic_inference(10) # prog 1 
@@ -395,8 +397,6 @@ plot(elapsed2[2:end], scores2[2:end], color="orange", label="Inference Program 3
 legend(loc="lower right")
 ylabel("Log Probability")
 xlabel("seconds")
-gca()[:set_xlim]((0, 8))
+gca()[:set_xlim]((0, 3))
 tight_layout()
 savefig("scores.pdf")
-
-

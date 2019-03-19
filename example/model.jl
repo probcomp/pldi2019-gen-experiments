@@ -3,33 +3,6 @@ import Random
 using DataFrames
 using CSV
 
-############################
-# reverse mode AD for fill #
-############################
-
-using ReverseDiff
-
-function Base.fill(x::ReverseDiff.TrackedReal{V,D,O}, n::Integer) where {V,D,O}
-    tp = ReverseDiff.tape(x)
-    out = ReverseDiff.track(fill(ReverseDiff.value(x), n), V, tp)
-    ReverseDiff.record!(tp, ReverseDiff.SpecialInstruction, fill, (x, n), out)
-    return out
-end
-
-@noinline function ReverseDiff.special_reverse_exec!(instruction::ReverseDiff.SpecialInstruction{typeof(fill)})
-    x, n = instruction.input
-    output = instruction.output
-    ReverseDiff.istracked(x) && ReverseDiff.increment_deriv!(x, sum(ReverseDiff.deriv(output)))
-    ReverseDiff.unseed!(output) 
-    return nothing
-end 
-
-@noinline function ReverseDiff.special_forward_exec!(instruction::ReverseDiff.SpecialInstruction{typeof(fill)})
-    x, n = instruction.input
-    ReverseDiff.value!(instruction.output, fill(ReverseDiff.value(x), n))
-    return nothing
-end 
-
 #########
 # model #
 #########
@@ -43,30 +16,25 @@ end
 
 const OUTLIER_STD = 10.
 
-@gen function datum(x::Float64, prob_outlier::Float64, @ad(slope), @ad(intercept), noise::Float64)
-    if @addr(bernoulli(prob_outlier), :z)
+@gen (grad) function datum(x, prob_outlier, (grad)(slope), (grad)(intercept), noise)::Float64
+    if @trace(bernoulli(prob_outlier), :z)
         (mu, std) = (0., OUTLIER_STD)
     else
         (mu, std) = (x * slope + intercept, noise)
     end
-    return @addr(normal(mu, std), :y)
+    return @trace(normal(mu, std), :y)
 end
 
-data = plate(datum)
+data = Map(datum)
 
-@gen function model(xs::Vector{Float64})
-    prob_outlier = @addr(uniform(0, 0.5), :prob_outlier)
-    noise = @addr(gamma(1, 1), :noise)
-    slope = @addr(normal(0, 2), :slope)
-    intercept = @addr(normal(0, 2), :intercept)
+@gen (grad, static) function model(xs::Vector{Float64})
+    prob_outlier = @trace(uniform(0, 0.5), :prob_outlier)
+    noise = @trace(gamma(1, 1), :noise)
+    slope = @trace(normal(0, 2), :slope)
+    intercept = @trace(normal(0, 2), :intercept)
     params = Params(prob_outlier, slope, intercept, noise)
-    @diff begin
-        addrs = [:prob_outlier, :slope, :intercept, :noise]
-        diffs = [@choicediff(addr) for addr in addrs]
-        argdiff = all(map(isnodiff, diffs)) ? noargdiff : unknownargdiff
-    end
     n = length(xs)
-    ys = @addr(data(xs, fill(prob_outlier, n), fill(slope, n), fill(intercept, n), fill(noise, n)), :data, argdiff)
+    ys = @trace(data(xs, fill(prob_outlier, n), fill(slope, n), fill(intercept, n), fill(noise, n)), :data)
     return ys
 end
 
@@ -85,8 +53,8 @@ function render_dataset(x::Vector{Float64}, y::Vector{Float64}, xlim, ylim)
 end
 
 function render_linreg(trace, xlim, ylim; line_alpha=1.0, point_alpha=1.0, show_color=true, show_line=true, show_points=true)
-    xs = get_call_record(trace).args[1]
-    assignment = get_assignment(trace)
+    xs = get_args(trace)[1]
+    assignment = get_choices(trace)
     ax = plt[:gca]()
     if show_line
         slope = assignment[:slope]
