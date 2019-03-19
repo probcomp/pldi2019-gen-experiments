@@ -1,47 +1,15 @@
 include("../shared.jl")
 
 import Random
-Random.seed!(432)
+Random.seed!(43)
 
 import Distributions
-using FunctionalCollections
 
-using ReverseDiff
-
-import Gen.get_static_argument_types
 import Gen.has_argument_grads
 import Gen.has_output_grad
 import Gen.logpdf
 import Gen.logpdf_grad
 import Gen.random
-
-############################
-# reverse mode AD for fill #
-############################
-
-function Base.fill(x::ReverseDiff.TrackedReal{V,D,O}, n::Integer) where {V,D,O}
-    tp = ReverseDiff.tape(x)
-    out = ReverseDiff.track(fill(ReverseDiff.value(x), n), V, tp)
-    ReverseDiff.record!(tp, ReverseDiff.SpecialInstruction, fill, (x, n), out)
-    return out
-end
-
-@noinline function ReverseDiff.special_reverse_exec!(
-        instruction::ReverseDiff.SpecialInstruction{typeof(fill)})
-    x, n = instruction.input
-    output = instruction.output
-    ReverseDiff.istracked(x) &&
-        ReverseDiff.increment_deriv!(x, sum(ReverseDiff.deriv(output)))
-    ReverseDiff.unseed!(output)
-    return nothing
-end
-
-@noinline function ReverseDiff.special_forward_exec!(
-        instruction::ReverseDiff.SpecialInstruction{typeof(fill)})
-    x, n = instruction.input
-    ReverseDiff.value!(instruction.output, fill(ReverseDiff.value(x), n))
-    return nothing
-end
 
 ###################
 # collapsed model #
@@ -89,19 +57,26 @@ has_output_grad(::TwoNormals) = true
 has_argument_grads(::TwoNormals) = (true, false, false)
 get_static_argument_types(::TwoNormals) = (Float64, Float64, Float64)
 
-data = plate(two_normals)
+@gen (static) function dummy_two_normal(
+        (grad)(mu::Float64),
+        inlier_std::Float64,
+        outlier_std::Float64)
+    y = @trace(two_normals(mu, inlier_std, outlier_std), :y)
+    return y
+end
 
-@compiled @gen function model(xs::Vector{Float64})
-    n::Int = length(xs)
-    inlier_std::Float64 = @addr(normal(0,2), :inlier_std)
-    outlier_std::Float64 = @addr(normal(0,2), :outlier_std)
-    slope::Float64 = @addr(normal(0,2), :slope)
-    intercept::Float64 = @addr(normal(0,2), :intercept)
-    means::Vector{Float64} = broadcast(+, slope * xs, intercept)
-    ys::PersistentVector{Float64} = @addr(
-        data(means, fill(sqrt(exp(inlier_std)), n), fill(sqrt(exp(outlier_std)), n)),
-        :data)
-    return ys
+data = Map(dummy_two_normal)
+
+@gen (static) function model(xs::Vector{Float64})
+    n = length(xs)
+    inlier_std = @trace(gamma(1, 1), :inlier_std)
+    outlier_std = @trace(gamma(1, 1), :outlier_std)
+    slope = @trace(normal(0, 2), :slope)
+    intercept = @trace(normal(0, 2), :intercept)
+    means = broadcast(+, slope * xs, intercept)
+    ys = @trace(
+        data(means, fill(inlier_std, n), fill(outlier_std, n)), :data)
+    return n
 end
 
 # Quick debugging function for computing the objective function.
@@ -119,99 +94,84 @@ end
 # inference operators #
 #######################
 
-@gen function observer(ys::Vector{Float64})
-    for (i, y) in enumerate(ys)
-        @addr(dirac(y), :data => i)
-    end
+@gen (static) function inlier_std_proposal(prev)
+    inlier_std = prev[:inlier_std]
+    @trace(normal(inlier_std, .5), :inlier_std)
 end
 
-@compiled @gen function inlier_std_proposal(prev)
-    inlier_std::Float64 = get_assignment(prev)[:inlier_std]
-    @addr(normal(inlier_std, .5), :inlier_std)
-end
-
-@compiled @gen function outlier_std_proposal(prev)
-    outlier_std::Float64 = get_assignment(prev)[:outlier_std]
-    @addr(normal(outlier_std, .5), :outlier_std)
+@gen (static) function outlier_std_proposal(prev)
+    outlier_std = prev[:outlier_std]
+    @trace(normal(outlier_std, .5), :outlier_std)
 end
 
 Gen.load_generated_functions()
+
+trace = simulate(model, ([1.,2.,3.],))
+code = Gen.codegen_choice_gradients(
+    typeof(trace),
+    typeof(StaticAddressSet(select(:slope, :intercept))),
+    Nothing)
+println(code)
+# exit()
 
 ##################
 # run experiment #
 ##################
 
-slope_intercept_selection = let
-    s = DynamicAddressSet()
-    push!(s, :slope)
-    push!(s, :intercept)
-    StaticAddressSet(s)
-end
-
-std_selection = let
-    s = DynamicAddressSet()
-    push!(s, :inlier_std)
-    push!(s, :outlier_std)
-    StaticAddressSet(s)
-end
+slope_intercept_selection = select(:slope, :intercept)
+std_selection = select(:inlier_std, :outlier_std)
 
 function do_inference(method, n)
     # prepare dataset
-    xs, ys = load_dataset("../train.csv")
-    observations = get_assignment(simulate(observer, (ys,)))
+    (xs, ys) = load_dataset("../train.csv")
+    observations = choicemap()
+    for (i, y) in enumerate(ys)
+        observations[:data => i => :y] = y
+    end
 
     # initial trace
     (trace, _) = generate(model, (xs,), observations)
 
-    score = get_call_record(trace).score
-    assignment = get_assignment(trace)
-    println((
-        score,
-        assignment[:slope],
-        assignment[:intercept],
-        sqrt(exp(assignment[:inlier_std])),
-        sqrt(exp(assignment[:outlier_std])),
-    ))
+    score = get_score(trace)
 
     runtime = 0
     for i=1:n
         start = time()
         if method == "mala"
-            trace = mala(model, slope_intercept_selection, trace, 0.0001)
+            (trace, _accept) = mala(trace, slope_intercept_selection, 0.0001)
         elseif method == "map"
-            trace = map_optimize(model, slope_intercept_selection, trace,
-                min_step_size=1e-10, max_step_size=1e-1)
+            trace = map_optimize(trace, slope_intercept_selection,
+                max_step_size=1e-1, min_step_size=1e-10)
         else
             @assert false "Unknown method: $(method)"
         end
 
-        trace = mh(model, inlier_std_proposal, (), trace)
-        trace = mh(model, outlier_std_proposal, (), trace)
+        (trace, _) = mh(trace, inlier_std_proposal, ())
+        (trace, _) = mh(trace, outlier_std_proposal, ())
 
         elapsed = time() - start
         runtime += elapsed
 
         # report loop stats
-        score = get_call_record(trace).score
-        assignment = get_assignment(trace)
+        score = get_score(trace)
         println((
             score,
-            assignment[:slope],
-            assignment[:intercept],
-            sqrt(exp(assignment[:inlier_std])),
-            sqrt(exp(assignment[:outlier_std])),
+            trace[:slope],
+            trace[:intercept],
+            trace[:inlier_std],
+            trace[:outlier_std]
         ))
     end
 
-    return (
+    return ((
         n,
         runtime,
         score,
-        assignment[:slope],
-        assignment[:intercept],
-        assignment[:inlier_std],
-        assignment[:outlier_std],
-        )
+        trace[:slope],
+        trace[:intercept],
+        trace[:inlier_std],
+        trace[:outlier_std]
+        ))
 end
 
 #################

@@ -2,9 +2,8 @@ include("../shared.jl")
 
 import Random
 import Distributions
-using FunctionalCollections
 
-import Gen: random, logpdf, get_static_argument_types
+import Gen: random, logpdf
 
 ###################
 # collapsed model #
@@ -27,18 +26,20 @@ function random(::TwoNormals, mu, sigma1, sigma2)
     mu + (rand() < 0.5 ? sigma1 : sigma2) * randn()
 end
 
-get_static_argument_types(::TwoNormals) = [Float64, Float64, Float64]
+@gen (static) function dummy_two_normal(mu, inlier_std, outlier_std)
+    @trace(two_normals(mu, inlier_std, outlier_std), :y)
+end
 
-data = plate(two_normals)
+data = Map(dummy_two_normal)
 
-@compiled @gen function model(xs::Vector{Float64})
-    n::Int = length(xs)
-    inlier_std::Float64 = @addr(gamma(1, 1), :inlier_std)
-    outlier_std::Float64 = @addr(gamma(1, 1), :outlier_std)
-    slope::Float64 = @addr(normal(0, 2), :slope)
-    intercept::Float64 = @addr(normal(0, 2), :intercept)
-    means::Vector{Float64} = broadcast(+, slope * xs, intercept)
-    ys::PersistentVector{Float64} = @addr(
+@gen (static) function model(xs::Vector{Float64})
+    n = length(xs)
+    inlier_std = @trace(gamma(1, 1), :inlier_std)
+    outlier_std = @trace(gamma(1, 1), :outlier_std)
+    slope = @trace(normal(0, 2), :slope)
+    intercept = @trace(normal(0, 2), :intercept)
+    means = broadcast(+, slope * xs, intercept)
+    ys = @trace(
         data(means, fill(inlier_std, n), fill(outlier_std, n)), :data)
     return ys
 end
@@ -47,35 +48,29 @@ end
 # inference operators #
 #######################
 
-@compiled @gen function slope_proposal(prev)
-    slope::Float64 = get_assignment(prev)[:slope]
-    @addr(normal(slope, .5), :slope)
+@gen (static) function slope_proposal(prev)
+    slope = prev[:slope]
+    @trace(normal(slope, .5), :slope)
 end
 
-@compiled @gen function intercept_proposal(prev)
-    intercept::Float64 = get_assignment(prev)[:intercept]
-    @addr(normal(intercept, .5), :intercept)
+@gen (static) function intercept_proposal(prev)
+    intercept = prev[:intercept]
+    @trace(normal(intercept, .5), :intercept)
 end
 
-@compiled @gen function inlier_std_proposal(prev)
-    inlier_std::Float64 = get_assignment(prev)[:inlier_std]
-    @addr(normal(inlier_std, .5), :inlier_std)
+@gen (static) function inlier_std_proposal(prev)
+    inlier_std = prev[:inlier_std]
+    @trace(normal(inlier_std, .5), :inlier_std)
 end
 
-@compiled @gen function outlier_std_proposal(prev)
-    outlier_std::Float64 = get_assignment(prev)[:outlier_std]
-    @addr(normal(outlier_std, .5), :outlier_std)
+@gen (static) function outlier_std_proposal(prev)
+    outlier_std = prev[:outlier_std]
+    @trace(normal(outlier_std, .5), :outlier_std)
 end
 
 function logsumexp(arr)
     min_arr = maximum(arr)
     min_arr + log(sum(exp.(arr .- min_arr)))
-end
-
-@gen function observer(ys::Vector{Float64})
-    for (i, y) in enumerate(ys)
-        @addr(dirac(y), :data => i)
-    end
 end
 
 Gen.load_generated_functions()
@@ -85,10 +80,11 @@ Gen.load_generated_functions()
 ##################
 
 function do_inference(n)
-
-    # prepare dataset
-    xs, ys = load_dataset("../train.csv")
-    observations = get_assignment(simulate(observer, (ys,)))
+    (xs, ys) = load_dataset("../train.csv")
+    observations = choicemap()
+    for (i, y) in enumerate(ys)
+        observations[:data => i => :y] = y
+    end
 
     # initial trace
     (trace, weight) = generate(model, (xs,), observations)
@@ -97,29 +93,27 @@ function do_inference(n)
     for i=1:n
         start = time()
         # steps on the parameters
-        trace = mh(model, slope_proposal, (), trace)
-        trace = mh(model, intercept_proposal, (), trace)
-        trace = mh(model, inlier_std_proposal, (), trace)
-        trace = mh(model, outlier_std_proposal, (), trace)
+        (trace, _accept) = mh(trace, slope_proposal, ())
+        (trace, _accept) = mh(trace, intercept_proposal, ())
+        (trace, _accept) = mh(trace, inlier_std_proposal, ())
+        (trace, _accept) = mh(trace, outlier_std_proposal, ())
         elapsed = time() - start
         runtime += elapsed
 
-		assignment = get_assignment(trace)
-        score = get_call_record(trace).score
-		println((score, assignment[:inlier_std], assignment[:outlier_std],
-            assignment[:slope], assignment[:intercept]))
+        score = get_score(trace)
+		println((score, trace[:inlier_std], trace[:outlier_std],
+            trace[:slope], trace[:intercept]))
     end
 
-	assignment = get_assignment(trace)
-    score = get_call_record(trace).score
+    score = get_score(trace)
     return (
         n,
         runtime,
         score,
-        assignment[:slope],
-        assignment[:intercept],
-        assignment[:inlier_std],
-        assignment[:outlier_std],
+        trace[:slope],
+        trace[:intercept],
+        trace[:inlier_std],
+        trace[:outlier_std],
         )
 end
 
