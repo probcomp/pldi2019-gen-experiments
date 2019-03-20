@@ -106,14 +106,6 @@ end
 
 Gen.load_generated_functions()
 
-trace = simulate(model, ([1.,2.,3.],))
-code = Gen.codegen_choice_gradients(
-    typeof(trace),
-    typeof(StaticAddressSet(select(:slope, :intercept))),
-    Nothing)
-println(code)
-# exit()
-
 ##################
 # run experiment #
 ##################
