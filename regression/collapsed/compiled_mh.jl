@@ -101,8 +101,12 @@ function do_inference(n)
         runtime += elapsed
 
         score = get_score(trace)
-		println((score, trace[:inlier_std], trace[:outlier_std],
-            trace[:slope], trace[:intercept]))
+		println((
+            i, score,
+            trace[:inlier_std],
+            trace[:outlier_std],
+            trace[:slope],
+            trace[:intercept]))
     end
 
     score = get_score(trace)

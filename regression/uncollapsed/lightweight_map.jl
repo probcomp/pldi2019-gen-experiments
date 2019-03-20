@@ -65,7 +65,8 @@ function do_inference(n)
 
         # report loop stats
         score = get_score(trace)
-        println((i, score,
+        println((
+            i, score,
             trace[:slope],
             trace[:intercept],
             sqrt(exp(trace[:inlier_std])),

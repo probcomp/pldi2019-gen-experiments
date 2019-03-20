@@ -63,15 +63,16 @@ function do_inference(method, n)
         elapsed = time() - start
         runtime += elapsed
 
+        # report loop stats
         score = get_score(trace)
         println((
-            ("score", score),
-            ("slope", trace[:slope]),
-            ("intercept", trace[:intercept]),
-            ("inlier_std", sqrt(exp(trace[:inlier_std]))),
-            ("outlier_std", sqrt(exp(trace[:outlier_std]))),
-        ))
+            i, score,
+            trace[:slope],
+            trace[:intercept],
+            sqrt(exp(trace[:inlier_std])),
+            sqrt(exp(trace[:outlier_std]))))
     end
+
     score = get_score(trace)
     return (
         n,
