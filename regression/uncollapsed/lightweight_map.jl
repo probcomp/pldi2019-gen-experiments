@@ -91,7 +91,7 @@ end
 
 do_inference(10)
 
-results = do_inference(100)
+results = do_inference(50)
 fname = "lightweight_map.results.csv"
 open(fname, "a") do f
     write(f, join(results, ',') * '\n')

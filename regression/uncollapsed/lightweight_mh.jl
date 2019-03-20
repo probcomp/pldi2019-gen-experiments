@@ -110,7 +110,7 @@ end
 
 do_inference(10)
 
-results = do_inference(200)
+results = do_inference(50)
 fname = "lightweight_mh.results.csv"
 open(fname, "a") do f
     write(f, join(results, ',') * '\n')
