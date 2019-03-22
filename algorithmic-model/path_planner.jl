@@ -341,3 +341,12 @@ function walk_path(path::Path, distances_from_start::Vector{Float64}, dist::Floa
     return point
 end
 
+function get_locations(maybe_path::Nullable{Path}, start::Point,
+                       speed::Float64, times::Vector{Float64})
+    if !isnull(maybe_path)
+        path = get(maybe_path)
+        return walk_path(path, speed, times)
+    else
+        return fill(start, length(times))
+    end
+end

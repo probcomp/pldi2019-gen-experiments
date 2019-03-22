@@ -1,4 +1,5 @@
 using Nullables
+using PyPlot
 
 #############
 # 2D scenes #
@@ -143,3 +144,29 @@ function intersects_path(tree::Tree, path_start::Point, path_end::Point)
 end
 
 
+###################
+# scene rendering #
+###################
+
+const patches = PyPlot.matplotlib[:patches]
+
+function render(polygon::Polygon, ax)
+    num_sides = length(polygon.vertices)
+    vertices = Matrix{Float64}(undef, num_sides, 2)
+    for (i, pt) in enumerate(polygon.vertices)
+        vertices[i,:] = [pt.x, pt.y]
+    end
+    poly = patches[:Polygon](vertices, true, facecolor="black")
+    ax[:add_patch](poly)
+end
+
+render(wall::Wall, ax) = render(wall.poly, ax)
+render(tree::Tree, ax) = render(tree.poly, ax)
+
+function render(scene::Scene, ax)
+    ax[:set_xlim]((scene.xmin, scene.xmax))
+    ax[:set_ylim]((scene.ymin, scene.ymax))
+    for obstacle in scene.obstacles
+        render(obstacle, ax)
+    end
+end

@@ -28,7 +28,7 @@ function make_scene()
 end
 
 const scene = make_scene()
-const times = collect(range(0, stop=1, length=20))
+const times = collect(range(0, stop=1, length=10))
 
 @gen function stop_proposal(prev_trace)
     @trace(uniform(0, 1), :stop_x)
@@ -72,19 +72,37 @@ function write_json_results(results, fname::AbstractString)
     end
 end
 
+function show_paths(start, dest, speed, noise)
+    Random.seed!(0)
+    figure(figsize=(32, 32))
+    constraints = choicemap((:start_x, start.x), (:start_y, start.y), (:stop_x, dest.x), (:stop_y, dest.y), (:speed, speed), (:noise, noise))
+    for i=1:15
+        subplot(4, 4, i)
+        ax = gca()
+        trace, = generate(model, (scene, times), constraints)
+        render(scene, trace, ax)
+    end
+    savefig("demo.png")
+end
+
 function experiment()
 
-    measurements = Point[Point(0.200671, 0.0610075), Point(0.0386265, 0.018819), Point(-0.0936057, 0.198287), Point(0.0406614, 0.305687), Point(-0.0144924, 0.188301), Point(-0.00687671, 0.279064), Point(0.134002, 0.409317), Point(0.138309, 0.269417), Point(0.0254159, 0.494116), Point(0.201053, 0.317992), Point(0.0584362, 0.235333), Point(0.201222, 0.573131), Point(0.19059, 0.46727), Point(0.16229, 0.403766), Point(0.38414, 0.47726), Point(0.200641, 0.480193), Point(0.213562, 0.491452), Point(0.234423, 0.548481), Point(0.1109, 0.81866), Point(0.0310508, 0.629564)]
+    # speed near 0.05, noise near 0.02
+    measurements = Point[Point(0.0982709, 0.106993), Point(0.0994289, 0.181833), Point(0.134535, 0.219951), Point(0.137926, 0.256249), Point(0.137359, 0.296606), Point(0.0975037, 0.373101), Point(0.140863, 0.403996), Point(0.133527, 0.46508), Point(0.142269, 0.515338), Point(0.107248, 0.555732)]
+
+    println(measurements)
+
+    Random.seed!(1)
 
     start = Point(0.1, 0.1)
 
     results = Dict()
-    reps = 10
+    reps = 50
     T = 10
     for (model, model_name) in [
-            (model, "model"),
             (static_model, "static-model"),
-            (static_model_no_cache, "static-model-no-cache")]
+            (static_model_no_cache, "static-model-no-cache"),
+            (model, "model")]
         println(model_name)
         traces = []
         elapsed_list = []
@@ -93,6 +111,7 @@ function experiment()
             start_time = time_ns()
             trace = inference(model, measurements[1:T], start, 1000)
             elapsed = Int(time_ns() - start_time) / 1e9
+            println("speed: $(trace[:speed]), noise: $(trace[:noise])")
             push!(elapsed_list, elapsed)
             push!(traces, trace)
         end
@@ -109,7 +128,7 @@ function experiment()
         ax[:axes][:yaxis][:set_ticks]([])
         for (i, trace) in enumerate(traces)
             render(scene, trace, ax; show_measurements=i==1, show_start=i==1,
-            show_path=false, show_noise=false, stop_alpha=0.2, path_alpha=0.2)
+            show_path=true, show_noise=false, stop_alpha=0.2, path_alpha=0.0, path_line_alpha=0.5)
         end
         fname = "inferred_$model_name.pdf"
         savefig(fname)

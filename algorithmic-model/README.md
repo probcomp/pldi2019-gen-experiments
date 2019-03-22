@@ -1,37 +1,11 @@
-# Scene and path planner library
+To generate Turing results:
+```
+cd turing
+JULIA_PROJECT=../.. julia generate_turing_results.jl
+```
 
-`scenes.jl`
-
-`path_planner.jl`
-
-# State Space Model Experiments
-
-`filtering.jl`
-
-`plot_filtering_results.jl`
-
-compiled (with markov)
-
-    - default proposal
-
-    - custom proposal
-
-lightweight (no markov)
-
-    - default proposal
-
-    - custom proposal
-
-lightweight (with markov)
-
-    - default proposal
-
-    - custom proposal
-
-# Destination inference experiments
-
-`compiled_model.jl`
-
-# Other 
-
-`demo.jl`
+To generate Gen results:
+```
+cd gen
+JULIA_PROJECT=../.. julia generate_gen_results.jl
+```
