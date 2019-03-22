@@ -102,7 +102,7 @@ end
 do_inference(10)
 
 results = do_inference(200)
-fname = "compiled_map.results.csv"
+fname = "static_map.results.csv"
 open(fname, "a") do f
     write(f, join(results, ',') * '\n')
 end

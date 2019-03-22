@@ -128,7 +128,7 @@ end
 do_inference(10)
 
 results = do_inference(200)
-fname = "compiled_mh.results.csv"
+fname = "static_mh.results.csv"
 open(fname, "a") do f
     write(f, join(results, ',') * '\n')
 end

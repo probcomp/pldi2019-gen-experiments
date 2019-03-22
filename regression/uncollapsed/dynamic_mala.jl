@@ -92,7 +92,7 @@ end
 do_inference("mala", 10)
 
 results = do_inference("mala", 1000)
-fname = "lightweight_mala.results.csv"
+fname = "dynamic_mala.results.csv"
 open(fname, "a") do f
     write(f, join(results, ',') * '\n')
 end

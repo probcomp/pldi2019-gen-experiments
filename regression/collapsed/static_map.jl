@@ -175,7 +175,7 @@ method = "map"
 do_inference(method, 10)
 
 results = do_inference(method, 500)
-fname = "compiled_$(method).results.csv"
+fname = "static_$(method).results.csv"
 open(fname, "a") do f
     write(f, join(results, ',') * '\n')
 end
