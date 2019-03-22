@@ -23,7 +23,7 @@ const measured_ys = [0.217256, 0.416599, 0.376985, 0.383586, 0.500322, 0.608227,
     
     # walk path
     locations = Vector{Point}(undef, steps)
-    dists = Vector{Float64}(undef, steps)
+    dists = TArray{Float64}(undef, steps)
     dists[1] ~ Normal(speed * times[1], dist_slack)
     locations[1] = walk_path(path, distances_from_start, dists[1])
     x_obs[1] ~ Normal(locations[1].x, noise)
@@ -57,7 +57,7 @@ import Random
 Random.seed!(1)
 
 num_reps = 50
-num_particles_list = [1, 3, 10, 30, 100, 300]
+const num_particles_list = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 200, 300]
 results = Dict()
 for num_particles in num_particles_list
     ess_threshold = num_particles / 2

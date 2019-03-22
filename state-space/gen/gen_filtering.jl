@@ -319,8 +319,8 @@ function static_default_proposal_pf(measured_xs, measured_ys,
     args = (1, KernelState(NaN, Point(NaN, NaN)), kernel_params)
     state = initialize_particle_filter(static_hmm, args, init_obs, num_particles)
     for step=2:length(measured_xs)
-        println(state.log_weights)
-        maybe_resample!(state, ess_threshold=ess_threshold, verbose=true)
+        #println(state.log_weights)
+        maybe_resample!(state, ess_threshold=ess_threshold, verbose=false)
         args = (step, KernelState(NaN, Point(NaN, NaN)), kernel_params)
         argdiffs = (UnknownChange(), NoChange(), NoChange())
         obs = choicemap()
@@ -381,7 +381,7 @@ function static_unfold_custom_proposal_pf(measured_xs, measured_ys,
     state = initialize_particle_filter(static_hmm, args, init_obs,
                 static_fancy_proposal_init, proposal_args, num_particles)
     for step=2:length(measured_xs)
-        maybe_resample!(state, ess_threshold=ess_threshold, verbose=true)
+        maybe_resample!(state, ess_threshold=ess_threshold, verbose=false)
         args = (step, KernelState(NaN, Point(NaN, NaN)), kernel_params)
         argdiffs = (UnknownChange(), NoChange(), NoChange())
         obs = choicemap()
@@ -412,7 +412,7 @@ function lightweight_default_proposal_pf(measured_xs, measured_ys,
     args = (1, path, precomputed.distances_from_start, times, speed, noise, dist_slack)
     state = initialize_particle_filter(lightweight_hmm, args, init_obs, num_particles)
     for step=2:length(measured_xs)
-        maybe_resample!(state, ess_threshold=ess_threshold, verbose=true)
+        maybe_resample!(state, ess_threshold=ess_threshold, verbose=false)
         args = (step, path, precomputed.distances_from_start, times, speed, noise, dist_slack)
         argdiffs = (UnknownChange(), NoChange(), NoChange(), 
             NoChange(), NoChange(), NoChange(), NoChange())
@@ -470,7 +470,7 @@ function lightweight_custom_proposal_pf(measured_xs, measured_ys,
     state = initialize_particle_filter(lightweight_hmm, args, init_obs,
                 lightweight_fancy_proposal_init, proposal_args, num_particles)
     for step=2:length(measured_xs)
-        maybe_resample!(state, ess_threshold=ess_threshold, verbose=true)
+        maybe_resample!(state, ess_threshold=ess_threshold, verbose=false)
         args = (step, path, precomputed.distances_from_start, times, speed, noise, dist_slack)
         argdiffs = (UnknownChange(), NoChange(), NoChange(), 
             NoChange(), NoChange(), NoChange(), NoChange())
@@ -504,7 +504,7 @@ function lightweight_unfold_default_proposal_pf(measured_xs, measured_ys,
     args = (1, KernelState(NaN, Point(NaN, NaN)), kernel_params)
     state = initialize_particle_filter(lightweight_hmm_with_unfold, args, init_obs, num_particles)
     for step=2:length(measured_xs)
-        maybe_resample!(state, ess_threshold=ess_threshold, verbose=true)
+        maybe_resample!(state, ess_threshold=ess_threshold, verbose=false)
         args = (step, KernelState(NaN, Point(NaN, NaN)), kernel_params)
         argdiffs = (UnknownChange(), NoChange(), NoChange(), 
             NoChange(), NoChange(), NoChange(), NoChange())
@@ -562,7 +562,7 @@ function lightweight_unfold_custom_proposal_pf(measured_xs, measured_ys,
     state = initialize_particle_filter(lightweight_hmm_with_unfold, args, init_obs,
                 lightweight_unfold_fancy_proposal_init, proposal_args, num_particles)
     for step=2:length(measured_xs)
-        maybe_resample!(state, ess_threshold=ess_threshold, verbose=true)
+        maybe_resample!(state, ess_threshold=ess_threshold, verbose=false)
         args = (step, KernelState(NaN, Point(NaN, NaN)), kernel_params)
         argdiffs = (UnknownChange(), NoChange(), NoChange(), 
             NoChange(), NoChange(), NoChange(), NoChange())
