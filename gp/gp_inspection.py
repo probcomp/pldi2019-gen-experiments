@@ -114,7 +114,9 @@ def plot_metric_evolution(path, metric):
     fig, ax = plt.subplots()
     ax.errorbar(x_runtime, y_metric_median,
         yerr=[y_metric_median-y_metric_low, y_metric_high-y_metric_median],
-        fmt='--.', label=metric)
+        linewidth=.5, fmt='--.', label=metric, color='blue',
+        )
+    ax.set_ylim([0.10, 0.40])
     ax.grid()
     # Save to disk.
     fname = path.split(os.sep)[-1]
@@ -130,8 +132,8 @@ def extract_metric_evolution(path, x_key, y_key):
     df = pd.read_csv(path)
     epochs = sorted(df['epoch'].unique())
     particles = sorted(df['particle'].unique())
-    xs = [df[df['epoch']==epoch][x_key] for epoch in epochs]
-    ys = [df[df['epoch']==epoch][y_key] for epoch in epochs]
+    xs = [df[df['epoch']==epoch][x_key].values for epoch in epochs]
+    ys = [df[df['epoch']==epoch][y_key].values for epoch in epochs]
     assert np.shape(xs) == (len(epochs), len(particles))
     assert np.shape(ys) == (len(epochs), len(particles))
     return np.asarray(xs), np.asarray(ys)
