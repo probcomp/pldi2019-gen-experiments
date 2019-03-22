@@ -1,42 +1,40 @@
 include("cov_tree.jl")
 
-@gen function covariance_prior(cur::Int)
-    node_type = @addr(categorical(node_dist), (cur, :type))
+# Model.
+
+@gen function covariance_prior()
+    node_type = @trace(categorical(node_dist), :type)
 
     if node_type == CONSTANT
-        param = @addr(uniform_continuous(0, 1), (cur, :param))
+        param = @trace(uniform_continuous(0, 1), :param)
         node = Constant(param)
 
     # linear kernel
     elseif node_type == LINEAR
-        param = @addr(uniform_continuous(0, 1), (cur, :param))
+        param = @trace(uniform_continuous(0, 1), :param)
         node = Linear(param)
 
     # squared exponential kernel
     elseif node_type == SQUARED_EXP
-        length_scale= @addr(uniform_continuous(0, 1), (cur, :length_scale))
+        length_scale= @trace(uniform_continuous(0, 1), :length_scale)
         node = SquaredExponential(length_scale)
 
     # periodic kernel
     elseif node_type == PERIODIC
-        scale = @addr(uniform_continuous(0, 1), (cur, :scale))
-        period = @addr(uniform_continuous(0, 1), (cur, :period))
+        scale = @trace(uniform_continuous(0, 1), :scale)
+        period = @trace(uniform_continuous(0, 1), :period)
         node = Periodic(scale, period)
 
     # plus combinator
     elseif node_type == PLUS
-        child1 = Gen.get_child(cur, 1, max_branch)
-        child2 = Gen.get_child(cur, 2, max_branch)
-        left = @splice(covariance_prior(child1))
-        right = @splice(covariance_prior(child2))
+        left = @trace(covariance_prior(), :left)
+        right = @trace(covariance_prior(), :right)
         node = Plus(left, right)
 
     # times combinator
     elseif node_type == TIMES
-        child1 = Gen.get_child(cur, 1, max_branch)
-        child2 = Gen.get_child(cur, 2, max_branch)
-        left = @splice(covariance_prior(child1))
-        right = @splice(covariance_prior(child2))
+        left = @trace(covariance_prior(), :left)
+        right = @trace(covariance_prior(), :right)
         node = Times(left, right)
 
     # unknown node type
@@ -49,46 +47,67 @@ end
 
 @gen function model(xs::Vector{Float64})
     n = length(xs)
-    covariance_fn::Node = @addr(covariance_prior(1), :tree)
-    noise = @addr(gamma(1, 1), :noise) + 0.01
+    covariance_fn::Node = @trace(covariance_prior(), :tree)
+    noise = @trace(gamma(1, 1), :noise) + 0.01
     cov_matrix = compute_cov_matrix_vectorized(covariance_fn, noise, xs)
-    @addr(mvnormal(zeros(n), cov_matrix), :ys)
+    @trace(mvnormal(zeros(n), cov_matrix), :ys)
     return covariance_fn
 end
 
-@gen function subtree_proposal(prev_trace, root::Int)
-    @addr(covariance_prior(root), :tree)
+# Proposals and inference.
+
+@gen function random_node_path(node::Node)
+    p_stop = isa(node, LeafNode) ? 1.0 : 0.5
+    if @trace(bernoulli(p_stop), :stop)
+        return :tree
+    else
+        (next_node, direction) = @trace(bernoulli(0.5), :left) ? (node.left, :left) : (node.right, :right)
+        rest_of_path = @trace(random_node_path(next_node), :rest_of_path)
+        if isa(rest_of_path, Pair)
+            return :tree => direction => rest_of_path[2]
+        else
+            return :tree => direction
+        end
+    end
 end
 
-@gen function noise_proposal(prev_trace)
-    @addr(gamma(1, 1), :noise)
+@gen function regen_random_subtree(prev_trace)
+    @trace(covariance_prior(), :new_subtree)
+    @trace(random_node_path(get_retval(prev_trace)), :path)
 end
 
-function correction(prev_trace, new_trace)
-    prev_size = size(get_call_record(prev_trace).retval)
-    new_size = size(get_call_record(new_trace).retval)
-    log(prev_size) - log(new_size)
+function subtree_involution(trace, fwd_assmt::ChoiceMap, path_to_subtree, proposal_args::Tuple)
+    # Need to return a new trace, a bwd_assmt, and a weight.
+    model_assmt = get_choices(trace)
+    bwd_assmt = choicemap()
+    set_submap!(bwd_assmt, :path, get_submap(fwd_assmt, :path))
+    set_submap!(bwd_assmt, :new_subtree, get_submap(model_assmt, :tree))
+    new_trace_update = choicemap()
+    set_submap!(new_trace_update, path_to_subtree, get_submap(fwd_assmt, :new_subtree))
+    (new_trace, weight, _, _) =
+        update(trace, get_args(trace), (NoChange(),), new_trace_update)
+    (new_trace, bwd_assmt, weight)
 end
+
+function run_mcmc(trace, iters::Int)
+    for iter=1:iters
+        (trace, _) = mh(trace, regen_random_subtree, (), subtree_involution)
+        (trace, _) = mh(trace, select(:noise))
+    end
+    return trace
+end
+
+# Initialize trace and extract variables.
 
 function initialize_trace(xs::Vector{Float64}, ys::Vector{Float64})
-    constraints = DynamicAssignment()
+    constraints = choicemap()
     constraints[:ys] = ys
     (trace, _) = generate(model, (xs,), constraints)
     return trace
 end
 
-function run_mcmc(trace, iters::Int)
-    for iter=1:iters
-        covariance_fn = get_call_record(trace).retval
-        root = pick_random_node_unbiased(covariance_fn, 1, max_branch)
-        trace = mh(model, subtree_proposal, (root,), trace, correction)
-        trace = mh(model, noise_proposal, (), trace)
-    end
-    return trace
-end
-
 function extract_cov_noise(trace)
-    cov = get_call_record(trace).retval
-    noise = get_assignment(trace)[:noise]
+    cov = get_retval(trace)
+    noise = trace[:noise]
     return (cov, noise)
 end
