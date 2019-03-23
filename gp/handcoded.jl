@@ -179,11 +179,11 @@ function replace_subtree(cov_fn::BinaryOpNode, cur::Int, cov_fn2::Node, cur2::In
 end
 
 # MH correction for biased sampling.
-function get_alpha_subtree_correct end
-get_alpha_subtree_correct(::LeafNode, ::LeafNode) = 0
-get_alpha_subtree_correct(::BinaryOpNode, ::BinaryOpNode) = 0
-get_alpha_subtree_correct(::LeafNode, ::BinaryOpNode) = -log(2)
-get_alpha_subtree_correct(::BinaryOpNode, ::LeafNode) = log(2)
+function get_alpha_subtree_biased end
+get_alpha_subtree_biased(::LeafNode, ::LeafNode) = 0
+get_alpha_subtree_biased(::BinaryOpNode, ::BinaryOpNode) = 0
+get_alpha_subtree_biased(::LeafNode, ::BinaryOpNode) = -log(2)
+get_alpha_subtree_biased(::BinaryOpNode, ::LeafNode) = log(2)
 
 
 function propose_new_subtree(prev_trace)
@@ -209,7 +209,7 @@ end
 function mh_resample_subtree(prev_trace)
     (new_trace, node_old, node_new) = propose_new_subtree(prev_trace)
     alpha_size = log(size(prev_trace.cov_fn)) - log(size(new_trace.cov_fn))
-    # alpha_size = get_alpha_subtree_correct(node_old, node_new)
+    # alpha_size = get_alpha_subtree_biased(node_old, node_new)
     alpha_ll = new_trace.log_likelihood - prev_trace.log_likelihood
     alpha = alpha_ll + alpha_size
     return log(rand()) < alpha ? new_trace : prev_trace
