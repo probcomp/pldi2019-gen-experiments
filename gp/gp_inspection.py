@@ -102,9 +102,9 @@ def plot_predictions(path, epoch=-1):
     print fname
 
 @parsable
-def plot_metric_evolution(path, metric):
+def plot_metric_evolution(path, metric, x='iters'):
     """Plot evolution of metric over time."""
-    runtimes, metrics = extract_metric_evolution(path, 'runtime', metric)
+    runtimes, metrics = extract_metric_evolution(path, x, metric)
     runtimes = runtimes[1:]
     metrics = metrics[1:]
     x_runtime = np.cumsum(np.median(runtimes, axis=1))
@@ -121,8 +121,8 @@ def plot_metric_evolution(path, metric):
     # Save to disk.
     fname = path.split(os.sep)[-1]
     fname = os.path.join(DIR_PLOTS,
-        fname.replace('.csv', '.evolution.metric@%s.png' % (metric,)))
-    ax.set_xlabel('Runtime')
+        fname.replace('.csv', '.evolution.metric@%s.x@%s.png' % (metric, x)))
+    ax.set_xlabel(x)
     ax.set_ylabel(metric)
     fig.savefig(fname)
     print fname
