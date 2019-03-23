@@ -27,7 +27,7 @@ function compute_log_likelihood_predictive(covariance_fn::Node, noise::Float64,
         xs::Vector{Float64}, ys::Vector{Float64}, new_xs::Vector{Float64},
         new_ys::Vector{Float64})
     mu, cov = get_conditional_mu_cov(covariance_fn, noise, xs, ys, new_xs)
-    return logpdf(mvnormal, new_ys, mu, cov)
+    return Gen.logpdf(mvnormal, new_ys, mu, cov)
 end
 
 """Return predictive samples of output values for new inputs."""

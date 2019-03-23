@@ -138,68 +138,7 @@ const node_type_to_num_children = Dict(
     PLUS => 2,
     TIMES => 2)
 
-const max_branch = 2
 const node_dist = Float64[0.2, 0.2, 0.2, 0.2, 0.1, 0.1]
-
-
-"""
-    pick_random_node(::Node, cur::Int, max_branch::Int)
-
-Return a random node in the subtree rooted at the given node, whose integer
-index is given. The sampling is biased to choose nodes at higher indexes
-in the tree.
-"""
-function pick_random_node end
-
-
-pick_random_node(node::LeafNode, cur::Int, max_branch::Int) = cur
-
-
-function pick_random_node(node::BinaryOpNode, cur::Int, max_branch::Int)
-    if bernoulli(0.5)
-        # pick this node
-        cur
-    else
-        # recursively pick from the subtrees
-        if bernoulli(0.5)
-            n_child = Gen.get_child(cur, 1, max_branch)
-            pick_random_node(node.left, n_child, max_branch)
-        else
-            n_child = Gen.get_child(cur, 2, max_branch)
-            pick_random_node(node.right, n_child, max_branch)
-        end
-    end
-end
-
-
-"""
-    pick_random_node_unbiased(::Node, cur::Int, max_branch::Int)
-
-Return a random node in the subtree rooted at the given node, whose integer
-index is given. The sampling is uniform at random over all nodes in the
-tree.
-"""
-function pick_random_node_unbiased end
-
-
-pick_random_node_unbiased(node::LeafNode, cur::Int, max_branch::Int) = cur
-
-
-function pick_random_node_unbiased(node::BinaryOpNode, cur::Int, max_branch::Int)
-    probs = [1, size(node.left), size(node.right)] ./ size(node)
-    choice = categorical(probs)
-    if choice == 1
-        return cur
-    elseif choice == 2
-        n_child = Gen.get_child(cur, 1, max_branch)
-        return pick_random_node_unbiased(node.left, n_child, max_branch)
-    elseif choice == 3
-        n_child = Gen.get_child(cur, 2, max_branch)
-        return pick_random_node_unbiased(node.right, n_child, max_branch)
-    else
-        @assert false "Unexpected child node $(choice)"
-    end
-end
 
 
 """Compute covariance matrix by evaluating function on each pair of inputs."""

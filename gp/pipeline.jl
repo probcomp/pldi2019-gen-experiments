@@ -250,6 +250,7 @@ elseif args["mode"] == "incremental"
     include("gp_predict.jl")
 elseif args["mode"] == "handcoded"
     include("handcoded.jl")
+    include("gp_predict.jl")
 else
     @assert false "Unknown mode: $(args["mode"])"
 end
