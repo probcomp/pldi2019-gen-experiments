@@ -142,8 +142,8 @@
 
 (defn filtering-experiment
     []
-    (let [num-particles-list [1 2 3 5 7 10 15 20 25 30 35 40 45 50 60 70 80 90 100 200 300]
-          num-reps 50]
+    (let [num-particles-list [1 2 3 5 7 10 15 20 25 30 35 40 45 50 60 70 80 90 100 200 300 400 500 1000 2000 3000]
+          num-reps 100]
         (println (spit "anglican-results.json" (json/write-str (zipmap num-particles-list (mapv
             (fn [num-particles]
                 (println num-particles)

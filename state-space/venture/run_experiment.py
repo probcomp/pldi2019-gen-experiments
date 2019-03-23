@@ -353,10 +353,10 @@ def lml_estimate(log_weights):
     return logsumexp(log_weights) - np.log(len(log_weights))
 
 all_results = dict()
-num_particles_list = [1, 3, 10, 30, 100, 300]
+num_particles_list = [1, 3, 10, 30, 100, 300, 1000, 3000]
 for num_particles in num_particles_list:
     print "num_particles={num_particles}".format(num_particles=num_particles)
-    results = execute_venture_program("do_pf({num_particles}, {num_reps})".format(num_particles=num_particles, num_reps=48))
+    results = execute_venture_program("do_pf({num_particles}, {num_reps})".format(num_particles=num_particles, num_reps=96))
     lml_list = []
     elapsed_list = []
     for replicate_results in results:

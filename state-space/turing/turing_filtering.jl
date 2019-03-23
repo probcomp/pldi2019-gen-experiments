@@ -56,8 +56,8 @@ end
 import Random
 Random.seed!(1)
 
-num_reps = 50
-const num_particles_list = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 200, 300]
+num_reps = 100
+const num_particles_list = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 1000, 2000, 3000]
 results = Dict()
 for num_particles in num_particles_list
     ess_threshold = num_particles / 2

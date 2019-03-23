@@ -74,6 +74,7 @@ print_crossing_point(gen_num_particles_list, gen_results_lightweight_unfold_cust
 print_crossing_point(venture_num_particles_list, venture_results, threshold, "Venture")
 
 # plot time accuracy curve
+
 figure(figsize=(8,4))
 plot_results(anglican_num_particles_list, anglican_results, "Anglican", "blue")
 plot_results(venture_num_particles_list, venture_results, "Venture", "green")
