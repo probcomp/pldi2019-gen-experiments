@@ -194,13 +194,20 @@ function propose_new_noise(prev_trace)
         log_likelihood)
 end
 
-function mh_resample(prev_trace, f_propose::Function)
-    new_trace = f_propose(prev_trace)
+function mh_resample_subtree(prev_trace)
+    new_trace = propose_new_subtree(prev_trace)
     alpha_size = log(size(prev_trace.cov_fn)) - log(size(new_trace.cov_fn))
     alpha_ll = new_trace.log_likelihood - prev_trace.log_likelihood
     alpha = alpha_ll + alpha_size
     return log(rand()) < alpha ? new_trace : prev_trace
 end
+
+function mh_resample_noise(prev_trace)
+    new_trace = propose_new_noise(prev_trace)
+    alpha = new_trace.log_likelihood - prev_trace.log_likelihood
+    return log(rand()) < alpha ? new_trace : prev_trace
+end
+
 
 # Pipeline API functions.
 
@@ -214,8 +221,8 @@ end
 function run_mcmc(prev_trace, iters::Int)
     new_trace = prev_trace
     for iter=1:iters
-        new_trace = mh_resample(new_trace, propose_new_subtree)
-        new_trace = mh_resample(new_trace, propose_new_noise)
+        new_trace = mh_resample_subtree(new_trace)
+        new_trace = mh_resample_noise(new_trace)
     end
     return new_trace
 end
