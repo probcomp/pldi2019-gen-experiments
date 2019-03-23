@@ -43,7 +43,8 @@ function print_crossing_point(num_particles_list::Vector{Int}, results::Dict, th
     end
     median_elapsed = median(results[string(chosen_num_particles)]["elapsed"])
     mean_lml = mean(results[string(chosen_num_particles)]["lmls"])
-    println("$name, $(success ? "" : ">") $chosen_num_particles particles, median elapsed: $median_elapsed, mean_lml: $mean_lml")
+    std_lml = std(results[string(chosen_num_particles)]["lmls"])
+    println("$name, $(success ? "" : ">") $chosen_num_particles particles, median elapsed: $median_elapsed, mean_lml: $mean_lml, +/-: $std_lml")
 end
 
 
