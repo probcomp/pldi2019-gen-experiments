@@ -35,21 +35,21 @@ function get_child(parent::Int, child_num::Int, max_branch::Int)
 end
 
 """
-    pick_random_node(::Node, cur::Int, max_branch::Int)
+    pick_random_node_biased(::Node, cur::Int, max_branch::Int)
 
 Return a random node in the subtree rooted at the given node, whose integer
 index is given. The sampling is biased to choose nodes at higher indexes
 in the tree.
 """
-function pick_random_node end
+function pick_random_node_biased end
 
 
-function pick_random_node(node::LeafNode, cur::Int, max_branch::Int)
+function pick_random_node_biased(node::LeafNode, cur::Int, max_branch::Int)
     return (cur, node)
 end
 
 
-function pick_random_node(node::BinaryOpNode, cur::Int, max_branch::Int)
+function pick_random_node_biased(node::BinaryOpNode, cur::Int, max_branch::Int)
     if bernoulli(0.5)
         # pick this node
         (cur, node)
@@ -57,10 +57,10 @@ function pick_random_node(node::BinaryOpNode, cur::Int, max_branch::Int)
         # recursively pick from the subtrees
         if bernoulli(0.5)
             n_child = get_child(cur, 1, max_branch)
-            pick_random_node(node.left, n_child, max_branch)
+            pick_random_node_biased(node.left, n_child, max_branch)
         else
             n_child = get_child(cur, 2, max_branch)
-            pick_random_node(node.right, n_child, max_branch)
+            pick_random_node_biased(node.right, n_child, max_branch)
         end
     end
 end
