@@ -89,9 +89,49 @@ function subtree_involution(trace, fwd_assmt::ChoiceMap, path_to_subtree, propos
     (new_trace, bwd_assmt, weight)
 end
 
+import Distributions
+
+"""Return log likelihood given input/output values."""
+function compute_log_likelihood(covariance_fn::Node, noise::Float64,
+        xs::Vector{Float64}, ys::Vector{Float64})
+    mu = zeros(length(xs))
+    cov = compute_cov_matrix_vectorized(covariance_fn, noise, xs)
+    mvn = Distributions.MvNormal(mu, cov)
+    return Distributions.logpdf(mvn, ys)
+end
+
+function compute_expected_alpha(prev_trace, new_trace)
+    prev_cov = get_retval(prev_trace)[1]
+    new_cov = get_retval(new_trace)[1]
+    prev_noise = prev_trace[:noise]
+    new_noise = new_trace[:noise]
+    xs = get_args(prev_trace)[1]
+    @assert xs == get_args(new_trace)[1]
+    ys = prev_trace[:ys]
+    @assert ys == new_trace[:ys]
+    @assert prev_noise == new_noise
+    compute_log_likelihood(new_cov, new_noise, xs, ys) - compute_log_likelihood(prev_cov, prev_noise, xs, ys)
+end
+
+function custom_subtree_move(trace)
+    (fwd_choices, fwd_score, fwd_ret) = propose(proposal, (trace, proposal_args...,))
+    (new_trace, bwd_choices, weight) = involution(trace, fwd_choices, fwd_ret, proposal_args)
+    (bwd_score, _) = assess(proposal, (new_trace, proposal_args...), bwd_choices)
+    alpha = weight - fwd_score + bwd_score
+    @assert isapprox(alpha, alpha_expected)
+    if log(rand()) < alpha
+        # accept
+        (new_trace, true)
+    else
+        # reject
+        (trace, false)
+    end
+end
+
 function run_mcmc(trace, iters::Int)
     for iter=1:iters
-        (trace, _) = mh(trace, regen_random_subtree, (), subtree_involution)
+        #(trace, _) = mh(trace, regen_random_subtree, (), subtree_involution)
+        (trace, _) = custom_subtree_move(trace)
         (trace, _) = mh(trace, select(:noise))
     end
     return trace
