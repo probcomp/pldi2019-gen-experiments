@@ -609,8 +609,8 @@ function experiment()
     params = Params(times, speed, dist_slack, noise, path)
 
     # parameters for particle filtering
-    num_particles_list = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 200, 300]
-    num_reps = 50
+    num_particles_list = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 1000, 2000, 3000]
+    num_reps = 100
 
     # experiments with static model
     write_json_results(
