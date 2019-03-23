@@ -25,6 +25,12 @@ function plot_results(num_particles_list::Vector{Int}, results::Dict, label::Str
 	    color=color,
 	    label=label,
         linestyle=linestyle)
+    for i=1:length(num_particles_list)
+        t = median_times[i]
+        l = mean_lmls[i]
+        num_particles = num_particles_list[i]
+        text(t, l, "$num_particles")
+    end
 end
 
 function print_crossing_point(num_particles_list::Vector{Int}, results::Dict, threshold::Real, name::String)
@@ -52,7 +58,7 @@ end
 
 const turing_num_particles_list = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 1000, 2000, 3000]
 const gen_num_particles_list = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 1000, 2000, 3000]
-const venture_num_particles_list = [1, 3, 10, 30]
+const venture_num_particles_list = [1, 3, 10, 30, 100, 300]
 const anglican_num_particles_list = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 1000, 2000, 3000]
 
 anglican_results = JSON.parsefile("anglican/anglican-results.json")
