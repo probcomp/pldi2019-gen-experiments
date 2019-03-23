@@ -192,8 +192,8 @@ end
 
 
 function propose_new_subtree(prev_trace)
-    (loc_delta, node_delta) =
-        pick_random_node_unbiased(prev_trace.cov_fn, 1, MAX_BRANCH_GP)
+    # (loc_delta, node_delta) = pick_random_node_unbiased(prev_trace.cov_fn, 1, MAX_BRANCH_GP)
+    (loc_delta, node_delta) = pick_random_node_biased(prev_trace.cov_fn, 1, MAX_BRANCH_GP)
     subtree = covariance_prior(loc_delta)
     cov_fn_new = replace_subtree(prev_trace.cov_fn, 1, subtree, loc_delta)
     log_likelihood = compute_log_likelihood(cov_fn_new, prev_trace.noise,
@@ -213,8 +213,8 @@ end
 
 function mh_resample_subtree(prev_trace)
     (new_trace, node_old, node_new) = propose_new_subtree(prev_trace)
-    alpha_size = get_alpha_subtree_unbiased(prev_trace.cov_fn, new_trace.cov_fn)
-    # alpha_size = get_alpha_subtree_biased(node_old, node_new)
+    # alpha_size = get_alpha_subtree_unbiased(prev_trace.cov_fn, new_trace.cov_fn)
+    alpha_size = get_alpha_subtree_biased(node_old, node_new)
     alpha_ll = new_trace.log_likelihood - prev_trace.log_likelihood
     alpha = alpha_ll + alpha_size
     return log(rand()) < alpha ? new_trace : prev_trace
