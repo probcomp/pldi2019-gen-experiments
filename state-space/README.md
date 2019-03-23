@@ -55,8 +55,8 @@ Therefore, our custom proposal distribution on $d_i$ takes the form of a *piecew
 The table below shows the minimum number of particles needed to achieve a mean log marginal likelihood estimate (averaged over 50 runs of the particle filter) that is at least 56.0, which is within 2 nats of the gold standard estimate based on the custom proposal with 300 particles.
 The median running time for that number of particles is also shown.
 
-Turing,  200 particles, median elapsed: 0.8655641395, mean_lml: 56.51343842478063
-Anglican,  200 particles, median elapsed: 0.2388469705, mean_lml: 56.84684253608214
-Gen (Default Proposal),  200 particles, median elapsed: 0.0899419205, mean_lml: 56.9603783513589
-Gen (Custom Proposal),  7 particles, median elapsed: 0.008099136, mean_lml: 56.431767716249276
+Gen (Custom Proposal),  7 particles, median elapsed: 0.008509028500000002, mean_lml: 57.02171838747693
+Gen (Default Proposal),  200 particles, median elapsed: 0.0880018745, mean_lml: 56.59452131355661
+Anglican,  200 particles, median elapsed: 0.274790248, mean_lml: 56.62756416795456
+Turing,  200 particles, median elapsed: 0.850794951, mean_lml: 56.85798523851118
 Venture, > 100 particles, median elapsed: 1607.934010386467, mean_lml: 49.49599808342767
