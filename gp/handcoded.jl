@@ -185,6 +185,11 @@ get_alpha_subtree_biased(::BinaryOpNode, ::BinaryOpNode) = 0
 get_alpha_subtree_biased(::LeafNode, ::BinaryOpNode) = -log(2)
 get_alpha_subtree_biased(::BinaryOpNode, ::LeafNode) = log(2)
 
+# MH correction for unbiased sampling.
+function get_alpha_subtree_unbiased(cov_fn_prev, cov_fn_prop)
+    return log(size(cov_fn_prev)) - log(size(cov_fn_prop))
+end
+
 
 function propose_new_subtree(prev_trace)
     (loc_delta, node_delta) =
@@ -208,7 +213,7 @@ end
 
 function mh_resample_subtree(prev_trace)
     (new_trace, node_old, node_new) = propose_new_subtree(prev_trace)
-    alpha_size = log(size(prev_trace.cov_fn)) - log(size(new_trace.cov_fn))
+    alpha_size = get_alpha_subtree_unbiased(prev_trace.cov_fn, new_trace.cov_fn)
     # alpha_size = get_alpha_subtree_biased(node_old, node_new)
     alpha_ll = new_trace.log_likelihood - prev_trace.log_likelihood
     alpha = alpha_ll + alpha_size
