@@ -27,6 +27,33 @@ function plot_results(num_particles_list::Vector{Int}, results::Dict, label::Str
         linestyle=linestyle)
 end
 
+function print_crossing_point(num_particles_list::Vector{Int}, results::Dict, threshold::Real, name::String)
+    success = false
+    local chosen_num_particles::Int
+    for num_particles in num_particles_list
+        mean_lml = mean(results[string(num_particles)]["lmls"])
+        if mean_lml > threshold
+            chosen_num_particles = num_particles
+            success = true
+            break
+        end
+    end
+    if !success
+        chosen_num_particles = maximum(num_particles_list)
+    end
+    median_elapsed = median(results[string(chosen_num_particles)]["elapsed"])
+    mean_lml = mean(results[string(chosen_num_particles)]["lmls"])
+    println("$name, $(success ? "" : ">") $chosen_num_particles particles, median elapsed: $median_elapsed, mean_lml: $mean_lml")
+end
+
+
+# load data 
+
+const turing_num_particles_list = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 200, 300]
+const gen_num_particles_list = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 200, 300]
+const venture_num_particles_list = [1, 3, 10, 30, 100]
+const anglican_num_particles_list = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 200, 300]
+
 anglican_results = JSON.parsefile("anglican/anglican-results.json")
 venture_results = JSON.parsefile("venture/venture_results.json")
 turing_results = JSON.parsefile("turing/turing_results.json")
@@ -37,11 +64,16 @@ gen_results_lightweight_custom_proposal = JSON.parsefile("gen/gen_results_lightw
 gen_results_lightweight_default_proposal = JSON.parsefile("gen/gen_results_lightweight_default_proposal.json")
 gen_results_static_custom_proposal = JSON.parsefile("gen/gen_results_static_custom_proposal.json")
 
+# print the runtime to cross the accuracy threshold
+
+threshold = 56
+print_crossing_point(turing_num_particles_list, turing_results, threshold, "Turing")
+print_crossing_point(anglican_num_particles_list, anglican_results, threshold, "Anglican")
+print_crossing_point(gen_num_particles_list, gen_results_lightweight_unfold_default_proposal, threshold, "Gen (Default Proposal)")
+print_crossing_point(gen_num_particles_list, gen_results_lightweight_unfold_custom_proposal, threshold, "Gen (Custom Proposal)")
+print_crossing_point(venture_num_particles_list, venture_results, threshold, "Venture")
+
 # plot time accuracy curve
-const turing_num_particles_list = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 200, 300]
-const gen_num_particles_list = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 200, 300]
-const venture_num_particles_list = [1, 3, 10, 30, 100]
-const anglican_num_particles_list = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 200, 300]
 figure(figsize=(8,4))
 plot_results(anglican_num_particles_list, anglican_results, "Anglican", "blue")
 plot_results(venture_num_particles_list, venture_results, "Venture", "green")

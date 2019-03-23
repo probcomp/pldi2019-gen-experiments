@@ -48,3 +48,15 @@ Because, within each interval, the model is a linear Gaussian state space model 
 The probability that $d_i$ lies in interval $k$ is given by $Z_k / Z$.
 Conditioned on the choice of interval, $d_i$ has a normal distribution.
 Therefore, our custom proposal distribution on $d_i$ takes the form of a *piecewise truncated normal distribution*.
+
+
+## Results
+
+The table below shows the minimum number of particles needed to achieve a mean log marginal likelihood estimate (averaged over 50 runs of the particle filter) that is at least 56.0, which is within 2 nats of the gold standard estimate based on the custom proposal with 300 particles.
+The median running time for that number of particles is also shown.
+
+Turing,  200 particles, median elapsed: 0.8655641395, mean_lml: 56.51343842478063
+Anglican,  200 particles, median elapsed: 0.2388469705, mean_lml: 56.84684253608214
+Gen (Default Proposal),  200 particles, median elapsed: 0.0899419205, mean_lml: 56.9603783513589
+Gen (Custom Proposal),  7 particles, median elapsed: 0.008099136, mean_lml: 56.431767716249276
+Venture, > 100 particles, median elapsed: 1607.934010386467, mean_lml: 49.49599808342767
