@@ -44,13 +44,15 @@ in the tree.
 function pick_random_node end
 
 
-pick_random_node(node::LeafNode, cur::Int, max_branch::Int) = cur
+function pick_random_node(node::LeafNode, cur::Int, max_branch::Int)
+    return (cur, node)
+end
 
 
 function pick_random_node(node::BinaryOpNode, cur::Int, max_branch::Int)
     if bernoulli(0.5)
         # pick this node
-        cur
+        (cur, node)
     else
         # recursively pick from the subtrees
         if bernoulli(0.5)
@@ -74,14 +76,16 @@ tree.
 function pick_random_node_unbiased end
 
 
-pick_random_node_unbiased(node::LeafNode, cur::Int, max_branch::Int) = cur
+function pick_random_node_unbiased(node::LeafNode, cur::Int, max_branch::Int)
+    return (cur, node)
+end
 
 
 function pick_random_node_unbiased(node::BinaryOpNode, cur::Int, max_branch::Int)
     probs = [1, size(node.left), size(node.right)] ./ size(node)
     choice = sample_categorical(probs)
     if choice == 1
-        return cur
+        return (cur, node)
     elseif choice == 2
         n_child = get_child(cur, 1, max_branch)
         return pick_random_node_unbiased(node.left, n_child, max_branch)
@@ -174,15 +178,23 @@ function replace_subtree(cov_fn::BinaryOpNode, cur::Int, cov_fn2::Node, cur2::In
     return typeof(cov_fn)(subtree_left, subtree_right)
 end
 
+# MH correction for biased sampling.
+function get_alpha_subtree_correct end
+get_alpha_subtree_correct(::LeafNode, ::LeafNode) = 0
+get_alpha_subtree_correct(::BinaryOpNode, ::BinaryOpNode) = 0
+get_alpha_subtree_correct(::LeafNode, ::BinaryOpNode) = -log(2)
+get_alpha_subtree_correct(::BinaryOpNode, ::LeafNode) = log(2)
+
 
 function propose_new_subtree(prev_trace)
-    loc_delta = pick_random_node_unbiased(prev_trace.cov_fn, 1, MAX_BRANCH_GP)
+    (loc_delta, node_delta) =
+        pick_random_node_unbiased(prev_trace.cov_fn, 1, MAX_BRANCH_GP)
     subtree = covariance_prior(loc_delta)
     cov_fn_new = replace_subtree(prev_trace.cov_fn, 1, subtree, loc_delta)
     log_likelihood = compute_log_likelihood(cov_fn_new, prev_trace.noise,
         prev_trace.xs, prev_trace.ys)
     return Trace(cov_fn_new, prev_trace.noise, prev_trace.xs, prev_trace.ys,
-        log_likelihood)
+        log_likelihood), node_delta, subtree
 end
 
 
@@ -195,8 +207,9 @@ function propose_new_noise(prev_trace)
 end
 
 function mh_resample_subtree(prev_trace)
-    new_trace = propose_new_subtree(prev_trace)
+    (new_trace, node_old, node_new) = propose_new_subtree(prev_trace)
     alpha_size = log(size(prev_trace.cov_fn)) - log(size(new_trace.cov_fn))
+    # alpha_size = get_alpha_subtree_correct(node_old, node_new)
     alpha_ll = new_trace.log_likelihood - prev_trace.log_likelihood
     alpha = alpha_ll + alpha_size
     return log(rand()) < alpha ? new_trace : prev_trace
