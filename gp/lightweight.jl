@@ -108,6 +108,6 @@ end
 
 function extract_cov_noise(trace)
     cov = get_retval(trace)
-    noise = trace[:noise]
+    noise = trace[:noise] + 0.01
     return (cov, noise)
 end
