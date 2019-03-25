@@ -81,7 +81,7 @@ function subtree_involution(trace, fwd_assmt::ChoiceMap, path_to_subtree, propos
     model_assmt = get_choices(trace)
     bwd_assmt = choicemap()
     set_submap!(bwd_assmt, :path, get_submap(fwd_assmt, :path))
-    set_submap!(bwd_assmt, :new_subtree, get_submap(model_assmt, :tree))
+    set_submap!(bwd_assmt, :new_subtree, get_submap(model_assmt, path_to_subtree))
     new_trace_update = choicemap()
     set_submap!(new_trace_update, path_to_subtree, get_submap(fwd_assmt, :new_subtree))
     (new_trace, weight, _, _) =
