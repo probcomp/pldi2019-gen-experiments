@@ -111,7 +111,7 @@ struct Trace
 end
 
 
-function covariance_prior(cur::Int)
+function covariance_prior()
     node_type = sample_categorical(node_dist)
 
     if node_type == CONSTANT
@@ -136,18 +136,14 @@ function covariance_prior(cur::Int)
 
     # plus combinator
     elseif node_type == PLUS
-        child1 = get_child(cur, 1, MAX_BRANCH_GP)
-        child2 = get_child(cur, 2, MAX_BRANCH_GP)
-        left = covariance_prior(child1)
-        right = covariance_prior(child2)
+        left = covariance_prior()
+        right = covariance_prior()
         node = Plus(left, right)
 
     # times combinator
     elseif node_type == TIMES
-        child1 = get_child(cur, 1, MAX_BRANCH_GP)
-        child2 = get_child(cur, 2, MAX_BRANCH_GP)
-        left = covariance_prior(child1)
-        right = covariance_prior(child2)
+        left = covariance_prior()
+        right = covariance_prior()
         node = Times(left, right)
 
     # unknown node type
@@ -192,7 +188,7 @@ end
 
 function mh_resample_subtree_biased(prev_trace)
     (loc_delta, node_delta) = pick_random_node_biased(prev_trace.cov_fn, 1, MAX_BRANCH_GP)
-    subtree = covariance_prior(loc_delta)
+    subtree = covariance_prior()
     cov_fn_new = replace_subtree(prev_trace.cov_fn, 1, subtree, loc_delta)
     log_likelihood = compute_log_likelihood(cov_fn_new, prev_trace.noise,
         prev_trace.xs, prev_trace.ys)
@@ -206,7 +202,7 @@ end
 
 function mh_resample_subtree_unbiased(prev_trace)
     (loc_delta, node_delta) = pick_random_node_unbiased(prev_trace.cov_fn, 1, MAX_BRANCH_GP)
-    subtree = covariance_prior(loc_delta)
+    subtree = covariance_prior()
     cov_fn_new = replace_subtree(prev_trace.cov_fn, 1, subtree, loc_delta)
     log_likelihood = compute_log_likelihood(cov_fn_new, prev_trace.noise,
         prev_trace.xs, prev_trace.ys)
@@ -246,7 +242,7 @@ end
 # Pipeline API functions.
 
 function initialize_trace(xs::Vector{Float64}, ys::Vector{Float64})
-    cov_fn::Node = covariance_prior(1)
+    cov_fn::Node = covariance_prior()
     noise = rand(Distributions.Gamma(1, 1)) + 0.01
     log_likelihood = compute_log_likelihood(cov_fn, noise, xs, ys)
     return Trace(cov_fn, noise, xs, ys, log_likelihood)
