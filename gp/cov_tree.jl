@@ -140,6 +140,8 @@ const node_type_to_num_children = Dict(
 
 const node_dist = Float64[0.2, 0.2, 0.2, 0.2, 0.1, 0.1]
 
+const MAX_BRANCH = 2
+
 
 """Compute covariance matrix by evaluating function on each pair of inputs."""
 function compute_cov_matrix(covariance_fn::Node, noise, xs)
