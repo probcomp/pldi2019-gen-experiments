@@ -206,7 +206,7 @@ end
 
 @gen function regen_random_subtree(prev_trace)
     prev_subtree_node = get_retval(prev_trace)
-    subtree_idx = @trace(random_node_path_biased(1, prev_subtree_node), :path)
+    subtree_idx = @trace(random_node_path_unbiased(1, prev_subtree_node), :path)
     @trace(subtree_proposal_recursive(subtree_idx), :subtree)
     return nothing
 end

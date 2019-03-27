@@ -93,7 +93,7 @@ end
 
 @gen function regen_random_subtree(prev_trace)
     @trace(covariance_prior(), :new_subtree)
-    @trace(random_node_path_biased(get_retval(prev_trace)), :path)
+    @trace(random_node_path_unbiased(get_retval(prev_trace)), :path)
 end
 
 function subtree_involution(trace, fwd_assmt::ChoiceMap, path_to_subtree, proposal_args::Tuple)

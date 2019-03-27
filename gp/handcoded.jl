@@ -251,7 +251,7 @@ end
 function run_mcmc(prev_trace, iters::Int)
     new_trace = prev_trace
     for iter=1:iters
-        new_trace = mh_resample_subtree_biased(new_trace)
+        new_trace = mh_resample_subtree_unbiased(new_trace)
         new_trace = mh_resample_noise(new_trace)
     end
     return new_trace
