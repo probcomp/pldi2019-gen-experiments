@@ -227,18 +227,6 @@ function subtree_involution(trace, fwd_choices::ChoiceMap, fwd_retval::Nothing, 
     # set_submap!(bwd_choices, :subtree, discard)
     set_submap!(bwd_choices, :subtree, get_submap(discard, :tree))
 
-
-    println("===================")
-    println("get_choices(trace)")
-    println(get_choices(trace))
-    println("fwd_choices")
-    println(fwd_choices)
-    println("get_choices(new_trace)")
-    println(get_choices(new_trace))
-    println("bwd_choices")
-    println(bwd_choices)
-    println("===================")
-
     (new_trace, bwd_choices, weight)
 end
 
