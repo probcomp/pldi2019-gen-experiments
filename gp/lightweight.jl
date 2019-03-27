@@ -71,6 +71,26 @@ end
     end
 end
 
+@gen function random_node_path_unbiased(node::Node)
+    p_stop = isa(node, LeafNode) ? 1.0 : 1/size(node)
+    if @trace(bernoulli(p_stop), :stop)
+        return :tree
+    else
+        p_left = size(node.left) / (size(node) - 1)
+        (next_node, direction) = @trace(bernoulli(p_left), :left) ? (node.left, :left) : (node.right, :right)
+        rest_of_path = @trace(random_node_path_unbiased(next_node), :rest_of_path)
+        if isa(rest_of_path, Pair)
+            return :tree => direction => rest_of_path[2]
+        else
+            return :tree => direction
+        end
+    end
+end
+
+@gen function random_node_path_root(node::Node)
+    return :tree
+end
+
 @gen function regen_random_subtree(prev_trace)
     @trace(covariance_prior(), :new_subtree)
     @trace(random_node_path_biased(get_retval(prev_trace)), :path)
