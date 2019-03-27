@@ -166,7 +166,7 @@ Gen.load_generated_functions()
 end
 
 
-@gen function random_node_path(cur::Int, node::Node)
+@gen function random_node_path_biased(cur::Int, node::Node)
     p_stop = isa(node, LeafNode) ? 1.0 : 0.5
     if @trace(bernoulli(p_stop), :stop)
         return cur
@@ -178,13 +178,35 @@ end
             next_node = node.right
             child = get_child(cur, 2, MAX_BRANCH)
         end
-        return @trace(random_node_path(child, next_node), :rest_of_path)
+        return @trace(random_node_path_biased(child, next_node), :rest_of_path)
     end
+end
+
+@gen function random_node_path_unbiased(cur::Int, node::Node)
+    p_stop = isa(node, LeafNode) ? 1.0 : 1/size(node)
+    if @trace(bernoulli(p_stop), :stop)
+        return cur
+    else
+        p_left = size(node.left) / (size(node) - 1)
+        if @trace(bernoulli(p_left), :left)
+            next_node = node.left
+            child = get_child(cur, 1, MAX_BRANCH)
+        else
+            next_node = node.right
+            child = get_child(cur, 2, MAX_BRANCH)
+        end
+        return @trace(random_node_path_biased(child, next_node), :rest_of_path)
+    end
+end
+
+
+@gen function random_node_path_root(cur::Int, node::Node)
+    return :tree
 end
 
 @gen function regen_random_subtree(prev_trace)
     prev_subtree_node = get_retval(prev_trace)
-    subtree_idx = @trace(random_node_path(1, prev_subtree_node), :path)
+    subtree_idx = @trace(random_node_path_biased(1, prev_subtree_node), :path)
     @trace(subtree_proposal_recursive(subtree_idx), :subtree)
     return nothing
 end
