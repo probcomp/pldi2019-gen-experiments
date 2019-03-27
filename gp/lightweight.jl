@@ -56,13 +56,13 @@ end
 
 # Proposals and inference.
 
-@gen function random_node_path(node::Node)
+@gen function random_node_path_biased(node::Node)
     p_stop = isa(node, LeafNode) ? 1.0 : 0.5
     if @trace(bernoulli(p_stop), :stop)
         return :tree
     else
         (next_node, direction) = @trace(bernoulli(0.5), :left) ? (node.left, :left) : (node.right, :right)
-        rest_of_path = @trace(random_node_path(next_node), :rest_of_path)
+        rest_of_path = @trace(random_node_path_biased(next_node), :rest_of_path)
         if isa(rest_of_path, Pair)
             return :tree => direction => rest_of_path[2]
         else
@@ -73,7 +73,7 @@ end
 
 @gen function regen_random_subtree(prev_trace)
     @trace(covariance_prior(), :new_subtree)
-    @trace(random_node_path(get_retval(prev_trace)), :path)
+    @trace(random_node_path_biased(get_retval(prev_trace)), :path)
 end
 
 function subtree_involution(trace, fwd_assmt::ChoiceMap, path_to_subtree, proposal_args::Tuple)
