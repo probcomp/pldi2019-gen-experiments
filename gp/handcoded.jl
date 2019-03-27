@@ -215,7 +215,7 @@ function mh_resample_subtree_unbiased(prev_trace)
 end
 
 function mh_resample_subtree_root(prev_trace)
-    cov_fn_new = covariance_prior(1)
+    cov_fn_new = covariance_prior()
     log_likelihood = compute_log_likelihood(cov_fn_new, prev_trace.noise,
         prev_trace.xs, prev_trace.ys)
     new_trace = Trace(cov_fn_new, prev_trace.noise, prev_trace.xs,
