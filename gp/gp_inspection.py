@@ -102,9 +102,9 @@ def plot_predictions(path, epoch=-1):
     print fname
 
 @parsable
-def plot_metric_evolution(path, metric):
+def plot_metric_evolution(path, metric, x='iters'):
     """Plot evolution of metric over time."""
-    runtimes, metrics = extract_metric_evolution(path, 'runtime', metric)
+    runtimes, metrics = extract_metric_evolution(path, x, metric)
     runtimes = runtimes[1:]
     metrics = metrics[1:]
     x_runtime = np.cumsum(np.median(runtimes, axis=1))
@@ -114,13 +114,15 @@ def plot_metric_evolution(path, metric):
     fig, ax = plt.subplots()
     ax.errorbar(x_runtime, y_metric_median,
         yerr=[y_metric_median-y_metric_low, y_metric_high-y_metric_median],
-        fmt='--.', label=metric)
+        linewidth=.5, fmt='--.', label=metric, color='blue',
+        )
+    ax.set_ylim([0.10, 0.40])
     ax.grid()
     # Save to disk.
     fname = path.split(os.sep)[-1]
     fname = os.path.join(DIR_PLOTS,
-        fname.replace('.csv', '.evolution.metric@%s.png' % (metric,)))
-    ax.set_xlabel('Runtime')
+        fname.replace('.csv', '.evolution.metric@%s.x@%s.png' % (metric, x)))
+    ax.set_xlabel(x)
     ax.set_ylabel(metric)
     fig.savefig(fname)
     print fname
@@ -130,8 +132,8 @@ def extract_metric_evolution(path, x_key, y_key):
     df = pd.read_csv(path)
     epochs = sorted(df['epoch'].unique())
     particles = sorted(df['particle'].unique())
-    xs = [df[df['epoch']==epoch][x_key] for epoch in epochs]
-    ys = [df[df['epoch']==epoch][y_key] for epoch in epochs]
+    xs = [df[df['epoch']==epoch][x_key].values for epoch in epochs]
+    ys = [df[df['epoch']==epoch][y_key].values for epoch in epochs]
     assert np.shape(xs) == (len(epochs), len(particles))
     assert np.shape(ys) == (len(epochs), len(particles))
     return np.asarray(xs), np.asarray(ys)

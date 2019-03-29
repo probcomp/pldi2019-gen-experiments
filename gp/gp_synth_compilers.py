@@ -4,8 +4,49 @@
 # Released under Apache 2.0; refer to LICENSE.txt.
 
 from cStringIO import StringIO
+from collections import OrderedDict
 
-from iventure.magics import convert_from_venture_value
+def convert_from_venture_value(venture_value):
+    """Convert a stack dict to python object."""
+    import venture.lite.value as vv
+    from venture.lite.types import Dict
+    if isinstance(venture_value, vv.VentureDict):
+        shallow = Dict().asPythonNoneable(venture_value)
+        deep = OrderedDict()
+        for key, value in shallow.iteritems():
+            deep[convert_from_venture_value(key)] = \
+                convert_from_venture_value(value)
+        return deep
+    elif isinstance(venture_value, vv.VentureNumber):
+        return venture_value.getNumber()
+    elif isinstance(venture_value, vv.VentureInteger):
+        return venture_value.getInteger()
+    elif isinstance(venture_value, vv.VentureString):
+        return venture_value.getString()
+    elif isinstance(venture_value, vv.VentureBool):
+        return venture_value.getBool()
+    elif isinstance(venture_value, vv.VentureAtom):
+        return venture_value.getAtom()
+    elif isinstance(venture_value, vv.VentureArray):
+        return [
+            convert_from_venture_value(val)
+            for val in venture_value.getArray()
+        ]
+    elif isinstance(venture_value, vv.VentureArrayUnboxed):
+        return [
+            convert_from_venture_value(val)
+            for val in venture_value.getArray()
+        ]
+    elif isinstance(venture_value, vv.VentureMatrix):
+        return venture_value.matrix
+    elif isinstance(venture_value, vv.VenturePair):
+        return [
+            convert_from_venture_value(val)
+            for val in venture_value.getArray()
+        ]
+    else:
+        raise ValueError(
+            'Venture value cannot be converted', str(venture_value))
 
 def compile_indent(stream, i):
     indentation = ' ' * i
