@@ -3,7 +3,7 @@
 assume get_tree_root = () -> {1};
 
 assume get_base_kernel_index ~ mem((node_index) ~> {
-    uniform_discrete(1,5) #tree:node_index
+    uniform_discrete(1,5)
 });
 
 
@@ -31,8 +31,7 @@ assume choose_primitive =  mem((node_index) ~> {
 });
 
 assume choose_operator = mem((node_index) ~> {
-    operator_symbol ~ categorical(simplex(.5, .5), ["+", "*"])
-        #tree #tree:pair("operator", node_index);
+    operator_symbol ~ categorical(simplex(.5, .5), ["+", "*"]);
     operator_symbol
 });
 
