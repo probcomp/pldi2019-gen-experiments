@@ -25,12 +25,12 @@ function plot_results(num_particles_list::Vector{Int}, results::Dict, label::Str
 	    color=color,
 	    label=label,
         linestyle=linestyle)
-    for i=1:length(num_particles_list)
-        t = median_times[i]
-        l = mean_lmls[i]
-        num_particles = num_particles_list[i]
-        text(t, l, "$num_particles")
-    end
+    #for i=1:length(num_particles_list)
+        #t = median_times[i]
+        #l = mean_lmls[i]
+        #num_particles = num_particles_list[i]
+        #text(t, l, "$num_particles")
+    #end
 end
 
 function print_crossing_point(num_particles_list::Vector{Int}, results::Dict, threshold::Real, name::String)
@@ -82,17 +82,19 @@ print_crossing_point(venture_num_particles_list, venture_results, threshold, "Ve
 
 # plot time accuracy curve
 
-figure(figsize=(8,4))
+figure(figsize=(2.75,2.5))
+plot_results(gen_num_particles_list, gen_results_lightweight_unfold_custom_proposal, "Gen (custom)", "red", "--")
+plot_results(gen_num_particles_list, gen_results_lightweight_unfold_default_proposal, "Gen (generic)", "red", "-")
 plot_results(anglican_num_particles_list, anglican_results, "Anglican", "blue")
-plot_results(venture_num_particles_list, venture_results, "Venture", "green")
 plot_results(turing_num_particles_list, turing_results, "Turing", "purple")
-plot_results(gen_num_particles_list, gen_results_lightweight_unfold_default_proposal, "Gen (Default Proposal)", "red", "--")
-plot_results(gen_num_particles_list, gen_results_lightweight_unfold_custom_proposal, "Gen (Custom Proposal)", "orange", "--")
+plot_results(venture_num_particles_list, venture_results, "Venture", "green")
 legend(loc="lower right")
 ylabel("Accuracy (LML estimate)")
-xlabel("seconds")
+xlabel("Median runtime (sec.)")
 gca()[:set_xscale]("log")
+xlim = gca().get_xlim()
+plot(xlim, [threshold, threshold], "-", color="black")
 ax = gca()
-ax.set_ylim((0, 60))
+ax.set_ylim((30, 60))
 tight_layout()
 savefig("lml_estimates.pdf")
