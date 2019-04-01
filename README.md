@@ -17,7 +17,7 @@ This repository contains the code for figures and experiments appearing in
 - [state-space](./state-space) contains the code for the nonlinear state-space model in Section 7.4.
 - [pose](./pose) contains the code of the pose estimation application in Section 7.5.
 
-## Basic instructions to set up the Julia environment.
+## Basic instructions to set up the Julia environment
 
 1. Download and install Julia v1.0
 
