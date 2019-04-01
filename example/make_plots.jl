@@ -5,30 +5,32 @@ using DataFrames
 # rendering #
 #############
 
-using PyCall
-@pyimport matplotlib.pyplot as plt
+using PyPlot: plt
 
 const POINT_SIZE = 10
 
 function render_dataset(x::Vector{Float64}, y::Vector{Float64}, xlim, ylim)
-    ax = plt[:gca]()
-    ax[:scatter](x, y, c="black", alpha=1., s=POINT_SIZE)
-    ax[:set_xlim](xlim)
-    ax[:set_ylim](ylim)
+    ax = plt.gca()
+    ax.scatter(x, y, c="black", alpha=1., s=POINT_SIZE)
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
 end
 
-function render_linreg(trace, xlim, ylim; line_alpha=1.0, point_alpha=1.0, show_color=true, show_line=true, show_points=true)
+function render_linreg(trace, xlim, ylim;
+        line_alpha=1.0, point_alpha=1.0, show_color=true, show_line=true,
+        show_points=true)
     xs = get_args(trace)[1]
     assignment = get_choices(trace)
-    ax = plt[:gca]()
+    ax = plt.gca()
     if show_line
         slope = assignment[:slope]
         intercept = assignment[:intercept]
         line_xs = [xlim[1], xlim[2]]
         line_ys = slope * line_xs .+ intercept
-        plt[:plot](line_xs, line_ys, color="black", alpha=line_alpha)
+        plt.plot(line_xs, line_ys, color="black", alpha=line_alpha)
         noise = assignment[:noise]
-        plt[:fill_between](line_xs, line_ys .- 2*noise, line_ys .+ 2*noise, color="black", alpha=0.2)
+        plt.fill_between(line_xs, line_ys .- 2*noise, line_ys .+ 2*noise,
+            color="black", alpha=0.2)
     end
 
     # plot data points
@@ -46,10 +48,10 @@ function render_linreg(trace, xlim, ylim; line_alpha=1.0, point_alpha=1.0, show_
             colors[i] = color
             ys[i] = y
         end
-        ax[:scatter](xs, ys, c=colors, alpha=point_alpha, s=POINT_SIZE)
+        ax.scatter(xs, ys, c=colors, alpha=point_alpha, s=POINT_SIZE)
     end
-    ax[:set_xlim](xlim)
-    ax[:set_ylim](ylim)
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
 end
 
 # make the plot
@@ -70,8 +72,8 @@ plt.plot(elapsed2[2:end], scores2[2:end], color="green", label="Inference Progra
 plt.legend(loc="lower right")
 plt.ylabel("Log Probability")
 plt.xlabel("Runtime (seconds)")
-plt.gca()[:set_xlim]((0, 2))
+plt.gca().set_xlim((0, 2))
 fig = plt.gcf()
-fig[:set_size_inches]((5, 2))
-fig[:tight_layout](pad=0)
+fig.set_size_inches((5, 2))
+fig.tight_layout(pad=0)
 plt.savefig("scores.pdf")
