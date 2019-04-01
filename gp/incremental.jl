@@ -201,7 +201,7 @@ end
 
 
 @gen function random_node_path_root(cur::Int, node::Node)
-    return :tree
+    return 1
 end
 
 @gen function regen_random_subtree(prev_trace)
