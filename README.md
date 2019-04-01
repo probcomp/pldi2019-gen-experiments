@@ -1,48 +1,32 @@
-# pldi2019-gen-experiments
-Experiments for PLDI 2019 submission on Gen
+# Experiments for Gen, PLDI 2019
+
+This repository contains the code for figures and experiments appearing in
+
+> Marco F. Cusumano-Towner, Feras A. Saad, Alex Lew, and Vikash K. Mansinghka.
+> 2019. Gen: A General-Purpose Probabilistic Programming System with
+> Programmable Inference. To Appear In Proceedings of 39th ACM SIGPLAN
+> Conference on Programming Language Design and Implementation (PLDI'19). ACM,
+> New York, NY, USA
+
+## Structure of the repository
+
+- [example](./example) contains the code for the tutorial in Figure 2.
+- [regression](./regression) contains the code for the robust Bayesian regression baseline in Section 7.1.
+- [gp](./gp) contains the code for the Gaussian process structure benchmark in Section 7.2.
+- [algorithmic-model](./algorithmic-model) contains the code for the algorithmic model of an autonomous agent in Section 7.3.
+- [state-space](./state-space) contains the code for the nonlinear state-space model in Section 7.4.
+- [pose](./pose) contains the code of the pose estimation application in Section 7.5.
 
 ## Basic instructions to set up the Julia environment.
 
-1. Download and install Julia v0.7
+1. Download and install Julia v1.0
 
 2. Clone `git@github.com:probcomp/pldi2019-gen-experiments`
 
-3. Clone `git@github.com:probcomp/Gen`
-    - run `cd Gen`.
-    - run `git checkout 20181022-marcoct-pcfg`.
+3. Run `export JULIA_PROJECT=/path/to/pldi2019-gen-experiments`, where
+   `/path/to` should be the prefix of the absolute path of this repository on
+   your local disk.
 
-4. Clone `git@github.com:JuliaCollections/FunctionalCollections.jl`
-    - run `cd FunctionalCollections.jl`.
-    - run `checkout b261b9daa8ea438f1a63c78fe10d722ba581583c`.
+4. Set the environment variable `JULIA_PROJECT` to the full path of this repository.
 
-5. Run `export JULIA_PROJECT=/path/to/pldi2019-gen-experiments`, where
-    `/path/to` should be the prefix of the absolute path on your local disk.
-
-6. Run `cd pldi2019-gen-experiments`
-    - run `julia`
-    - type `]` to enter the `pkg>` shell
-    - run `develop /path/to/Gen`.
-    - run `develop /path/to/FunctionalCollections.jl`
-
-7. Configure `PyPlot` as follows
-     - run `julia`
-     - run `ENV["PYTHON"]=""`
-     - type `]` to enter the `pkg>` shell
-     - run `build PyCall`
-
-8. Make sure that `JULIA_PROJECT` is set to the full path of
-    `pldi2019-gen-experiments` when using this repo going forward.
-
-9. Test your installation worked by running an experiment, e.g.
-
-        $ cd pldi2019-gen-experiments/gp
-
-        $ ./pipeline.jl --n-test=20 \
-            --nprobe-held-in=2 \
-            --npred-held-in=1 \
-            --shortname=nVzAI \
-            --iters=5 \
-            --epochs=1000 \
-            --chains=1 \
-            ./resources/matlab_timeseries/01-airline.csv \
-            incremental
+5. Install dependencies using `julia -e 'using Pkg; Pkg.instantiate()'
