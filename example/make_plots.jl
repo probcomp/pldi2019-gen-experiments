@@ -57,16 +57,16 @@ end
 df = DataFrame(CSV.File("example-data-prog1.csv"))
 elapsed1, scores1 = (df[:elapsed], df[:scores])
 
-df = DataFrame(CSV.File("example-data-prog3.csv"))
-elapsed2, scores2 = (df[:elapsed], df[:scores])
+# df = DataFrame(CSV.File("example-data-prog3.csv"))
+# elapsed2, scores2 = (df[:elapsed], df[:scores])
 
 df = DataFrame(CSV.File("example-data-prog2.csv"))
-elapsed3, scores3 = (df[:elapsed], df[:scores])
+elapsed2, scores2 = (df[:elapsed], df[:scores])
 
 plt.figure()
-plt.plot(elapsed1[2:end], scores1[2:end], color="blue", label="Inference Program 1")
-plt.plot(elapsed3[2:end], scores3[2:end], color="green", label="Inference Program 2")
-plt.plot(elapsed2[2:end], scores2[2:end], color="orange", label="Inference Program 3")
+plt.plot(elapsed1[2:end], scores1[2:end], color="orange", label="Inference Program 1")
+plt.plot(elapsed2[2:end], scores2[2:end], color="green", label="Inference Program 2")
+# plt.plot(elapsed2[2:end], scores2[2:end], color="orange", label="Inference Program 3")
 plt.legend(loc="lower right")
 plt.ylabel("Log Probability")
 plt.xlabel("Runtime (seconds)")
