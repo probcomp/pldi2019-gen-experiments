@@ -19,7 +19,7 @@ This repository contains the code for figures and experiments appearing in
 
 ## Basic instructions to set up the Julia environment
 
-1. Download and install Julia v1.0
+1. Download and install Julia v1.1
 
 2. Clone `git@github.com:probcomp/pldi2019-gen-experiments`
 
