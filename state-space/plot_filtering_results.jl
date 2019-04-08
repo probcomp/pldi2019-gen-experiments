@@ -71,6 +71,9 @@ gen_results_lightweight_custom_proposal = JSON.parsefile("gen/gen_results_lightw
 gen_results_lightweight_default_proposal = JSON.parsefile("gen/gen_results_lightweight_default_proposal.json")
 gen_results_static_custom_proposal = JSON.parsefile("gen/gen_results_static_custom_proposal.json")
 
+gold_standard = mean(gen_results_lightweight_unfold_custom_proposal["3000"]["lmls"])
+println("gold_standard: $gold_standard")
+
 # print the runtime to cross the accuracy threshold
 
 threshold = 56
