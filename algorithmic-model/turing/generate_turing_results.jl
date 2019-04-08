@@ -94,7 +94,7 @@ function write_json_results(results, fname::AbstractString)
     end
 end
 
-function experiment()
+function experiment(reps::Int, iters::Int)
 
     # speed near 0.05, noise near 0.02
     measurements = Point[Point(0.0982709, 0.106993), Point(0.0994289, 0.181833), Point(0.134535, 0.219951), Point(0.137926, 0.256249), Point(0.137359, 0.296606), Point(0.0975037, 0.373101), Point(0.140863, 0.403996), Point(0.133527, 0.46508), Point(0.142269, 0.515338), Point(0.107248, 0.555732)]
@@ -103,15 +103,13 @@ function experiment()
 
     Random.seed!(1)
 
-
-    reps = 50
     T = 10
     traces = []
     elapsed_list = []
     for i=1:reps
         println(i)
         start_time = time_ns()
-        trace = inference(model, measurements[1:T], start, 1000)
+        trace = inference(model, measurements[1:T], start, iters)
         elapsed = Int(time_ns() - start_time) / 1e9
         println("trace: $trace")
         push!(elapsed_list, elapsed)
@@ -138,4 +136,10 @@ function experiment()
     write_json_results(results, "turing_results.json")
 end
 
-experiment()
+# do a run to force compilation 
+println("initial run..")
+experiment(50, 100)
+
+# do a final run
+println("final run..")
+experiment(50, 1000)
