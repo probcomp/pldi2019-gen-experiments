@@ -1,6 +1,6 @@
 (ns r.core
   (:gen-class)
-  (:require 
+  (:require
     [anglican.core :refer :all]
     [anglican.runtime :refer :all]
     [anglican.emit :refer :all]
@@ -20,7 +20,7 @@
 
 
 ;; Uncollapsed model
-(defquery regress-uncollapsed 
+(defquery regress-uncollapsed
   [xs ys]
   (let [N  (count ys)
         slope (sample (normal 0 2))
@@ -42,7 +42,7 @@
 (defquery regress-uncollapsed-score
   [xs ys trace]
   (let [N (count ys)
-  					 {:keys [slope intercept inlier-std-choice outlier-std-choice outliers]} trace
+        {:keys [slope intercept inlier-std-choice outlier-std-choice outliers]} trace
         _ (observe (normal 0 2) slope)
         _ (observe (normal 0 2) intercept)
         _ (observe (normal 0 2) inlier-std-choice)
@@ -84,7 +84,7 @@
           inlier-std (sqrt (exp inlier-std-choice))
           outlier-std (sqrt (exp outlier-std-choice))]
         (loop [n 0]
-          (if (= n N) 
+          (if (= n N)
               nil
               (let [x (nth xs n)
                     y (nth ys n)
@@ -97,10 +97,10 @@
          :outlier-std-choice outlier-std-choice})))
 
 (with-primitive-procedures [two-normal pprint]
-  (defquery regress-collapsed-score 
+  (defquery regress-collapsed-score
     [xs ys trace]
     (let [N (count ys)
-    					 {:keys [slope intercept inlier-std-choice outlier-std-choice]} trace
+          {:keys [slope intercept inlier-std-choice outlier-std-choice]} trace
           _ (observe (normal 0 2) slope)
           _ (observe (normal 0 2) intercept)
           _ (observe (normal 0 2) inlier-std-choice)
@@ -108,7 +108,7 @@
           inlier-std (sqrt (exp inlier-std-choice))
           outlier-std (sqrt (exp outlier-std-choice))]
         (loop [n 0]
-          (if (= n N) 
+          (if (= n N)
               nil
               (let [x (nth xs n)
                     y (nth ys n)
@@ -120,27 +120,27 @@
   (dissoc (assoc trace :step i, :log-weight (:log-weight (first (doquery :importance scorer [xs ys trace])))) :outliers))
 
 (defn run-lmh [model scorer steps]
-	 (let [start (System/nanoTime)
-	       results (doall (take steps (map :result (doquery :lmh model [xs ys]))))
-	       elapsed (double (/ (- (System/nanoTime) start) 1e6))
-	       ]
-	   {:elapsed elapsed
-	   	:per-step (/ elapsed steps)
-	   	:traces (map-indexed #(score-trace scorer %2 %1) results)}))
+  (let [start (System/nanoTime)
+        results (doall (take steps (map :result (doquery :lmh model [xs ys]))))
+        elapsed (double (/ (- (System/nanoTime) start) 1e6))
+        ]
+    {:elapsed elapsed
+     :per-step (/ elapsed steps)
+     :traces (map-indexed #(score-trace scorer %2 %1) results)}))
 
 (defn process-lmh-to-csv-rows [steps result]
   (doseq [i (range steps)]
     (let [trace (nth (:traces result) i)]
-      (println (str i "," (* (inc i) (:per-step result)) "," (:slope trace) "," (:intercept trace) "," (:inlier-std-choice trace) "," 
+      (println (str i "," (* (inc i) (:per-step result)) "," (:slope trace) "," (:intercept trace) "," (:inlier-std-choice trace) ","
         (:outlier-std-choice trace))))))
 
 (def num-steps 2000)
 (def num-experiments 1)
-(defn experiment [] 
-		(doseq [i (range num-experiments)]
-				;(println (str "Lightweight MH for " n-steps " steps (collapsed) - iterate " i))
-				(println "iters,time-in-ms,slope,intercept,inlier-std,outlier-std")
-  		(process-lmh-to-csv-rows num-steps 
-  		  (run-lmh regress-collapsed regress-collapsed-score num-steps))))
+(defn experiment []
+  (doseq [i (range num-experiments)]
+    ;(println (str "Lightweight MH for " n-steps " steps (collapsed) - iterate " i))
+    (println "iters,time-in-ms,slope,intercept,inlier-std,outlier-std")
+    (process-lmh-to-csv-rows num-steps
+      (run-lmh regress-collapsed regress-collapsed-score num-steps))))
   ; (println "Lightweight MH for 1000 steps (collapsed)")
   ; (pprint (run-lmh regress-collapsed regress-collapsed-score 1000)))
