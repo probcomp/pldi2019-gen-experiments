@@ -131,7 +131,7 @@
 (defn process-lmh-to-csv-rows [steps result]
   (doseq [i (range steps)]
     (let [trace (nth (:traces result) i)]
-      (println (str i "," (* (inc i) (:per-step result)) "," (:slope trace) "," (:intercept trace) "," (:inlier-std-choice trace) ","
+      (println (str i "," (* (inc i) (/ (:per-step result) 1e3)) "," (:slope trace) "," (:intercept trace) "," (:inlier-std-choice trace) ","
         (:outlier-std-choice trace))))))
 
 (def num-steps 200)
