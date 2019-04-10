@@ -1,3 +1,4 @@
 *.pkl
 *.results.csv
+*.results.logps.csv
 *backups
