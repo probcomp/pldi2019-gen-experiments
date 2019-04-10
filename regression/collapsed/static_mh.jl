@@ -34,13 +34,14 @@ data = Map(dummy_two_normal)
 
 @gen (static) function model(xs::Vector{Float64})
     n = length(xs)
-    inlier_std = @trace(gamma(1, 1), :inlier_std)
-    outlier_std = @trace(gamma(1, 1), :outlier_std)
+    inlier_std = @trace(normal(0, 1), :inlier_std)
+    outlier_std = @trace(normal(0, 1), :outlier_std)
     slope = @trace(normal(0, 2), :slope)
     intercept = @trace(normal(0, 2), :intercept)
     means = broadcast(+, slope * xs, intercept)
-    ys = @trace(
-        data(means, fill(inlier_std, n), fill(outlier_std, n)), :data)
+    inlier_stds = fill(exp(inlier_std), n)
+    outlier_stds = fill(exp(outlier_std), n)
+    ys = @trace(data(means, inlier_stds, outlier_stds), :data)
     return ys
 end
 
