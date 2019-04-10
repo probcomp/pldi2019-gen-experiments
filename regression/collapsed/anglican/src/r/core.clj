@@ -137,7 +137,7 @@
 (def num-steps 2000)
 (def num-experiments 2)
 (defn experiment []
-  (println "num_steps,runtime,score,slope,intercept,inlier_log_var,outlier_log_var")
+  (println "num_steps,runtime,slope,intercept,inlier_log_var,outlier_log_var")
   (doseq [i (range num-experiments)]
     ;(println (str "Lightweight MH for " n-steps " steps (collapsed) - iterate " i))
     (process-lmh-to-csv-rows num-steps
