@@ -25,9 +25,9 @@
   (let [N  (count ys)
         slope (sample (normal 0 2))
         intercept (sample (normal 0 2))
-        inlier-std-choice (sample (normal 0 2))
+        inlier-std-choice (sample (normal 0 1))
         inlier-std (sqrt (exp inlier-std-choice))
-        outlier-std-choice (sample (normal 0 2))
+        outlier-std-choice (sample (normal 0 1))
         outlier-std (sqrt (exp outlier-std-choice))]
         (loop [n 0, outliers []]
           (if (= n N)
@@ -45,8 +45,8 @@
         {:keys [slope intercept inlier-std-choice outlier-std-choice outliers]} trace
         _ (observe (normal 0 2) slope)
         _ (observe (normal 0 2) intercept)
-        _ (observe (normal 0 2) inlier-std-choice)
-        _ (observe (normal 0 2) outlier-std-choice)
+        _ (observe (normal 0 1) inlier-std-choice)
+        _ (observe (normal 0 1) outlier-std-choice)
         inlier-std (sqrt (exp inlier-std-choice))
         outlier-std (sqrt (exp outlier-std-choice))]
      (loop [n 0]
