@@ -127,8 +127,19 @@
 	   	:per-step (/ elapsed steps)
 	   	:traces (map-indexed #(score-trace scorer %2 %1) results)}))
 
+(defn process-lmh-to-csv-row [steps result]
+  (let [last-trace (last (:traces result))]
+  (str steps "," (:elapsed result) "," (:slope last-trace) "," (:intercept last-trace) "," (:inlier-std-choice last-trace) ","
+     (:outlier-std-choice last-trace))))
+
+(def num-steps-settings [1 5 10 15 20 25 30 50 100 300 500 1000 2000])
+(def num-experiments-per-num-steps 1)
 (defn experiment [] 
-		(println "Lightweight MH for 10000 steps (uncollapsed)")
-  (pprint (run-lmh regress-uncollapsed regress-uncollapsed-score 10000))
-  (println "Lightweight MH for 1000 steps (collapsed)")
-  (pprint (run-lmh regress-collapsed regress-collapsed-score 1000)))
+		(doseq [n-steps num-steps-settings
+										i (range num-experiments-per-num-steps)]
+				;(println (str "Lightweight MH for " n-steps " steps (collapsed) - iterate " i))
+				(println "iters,time-in-ms,slope,intercept,inlier-std,outlier-std")
+  		(println (process-lmh-to-csv-row n-steps 
+  		  (run-lmh regress-collapsed regress-collapsed-score n-steps)))))
+  ; (println "Lightweight MH for 1000 steps (collapsed)")
+  ; (pprint (run-lmh regress-collapsed regress-collapsed-score 1000)))
