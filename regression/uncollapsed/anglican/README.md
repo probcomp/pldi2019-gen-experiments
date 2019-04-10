@@ -1,4 +1,9 @@
 # Anglican robust regression
+Download
+```
+wget https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein
+```
+
 Run
 ```
 lein run > results.csv
