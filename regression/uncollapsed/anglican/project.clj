@@ -3,4 +3,4 @@
   :dependencies [[org.clojure/clojure "1.8.0"]
 		 [anglican "1.0.0"]
 		 [org.clojure/data.csv "0.1.4"]]
-  :main anglican-regression.core/experiment)
+  :main r.core/experiment)

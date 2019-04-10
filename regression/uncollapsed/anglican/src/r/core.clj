@@ -1,4 +1,4 @@
-(ns anglican-regression.core
+(ns r.core
   (:gen-class)
   (:require 
     [anglican.core :refer :all]
