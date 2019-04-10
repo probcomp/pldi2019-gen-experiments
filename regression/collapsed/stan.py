@@ -31,7 +31,7 @@ slope_col = []
 intercept_col = []
 inlier_log_var_col = []
 outlier_log_var_col = []
-elapsed_col = []
+runtime_col = []
 prob_outlier_col = []
 
 # steps = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
@@ -41,22 +41,22 @@ for num_iters in steps:
     for rep in range(num_reps):
         fname = './tmp/samples_%s_%s.txt' % (num_iters, rep)
         start = time.time()
-        model.sampling(data=data, iter=num_iters, chains=1, sample_file=fname)
-        elapsed = time.time() - start
+        model.sampling(data=data, iter=num_iters, chains=1, sample_file=fname, verbose=False)
+        runtime = time.time() - start
         df = pd.read_csv(fname, sep=',', comment='#')
         num_rows = df.shape[0]
         slope_col.append(df['slope'][num_rows-1])
         intercept_col.append(df['intercept'][num_rows-1])
         inlier_log_var_col.append(df['inlier_log_var'][num_rows-1])
         outlier_log_var_col.append(df['outlier_log_var'][num_rows-1])
-        elapsed_col.append(elapsed)
+        runtime_col.append(runtime)
         prob_outlier_col.append(prob_outlier)
         num_iters_col.append(num_iters)
 
 results = pd.DataFrame(OrderedDict([
     ('num_steps'       , num_iters_col),
-    ('elapsed'         , elapsed_col),
-    ('score'           , [0]*len(elapsed_col)),
+    ('runtime'         , runtime_col),
+    ('score'           , [0]*len(runtime_col)),
     ('slope'           , slope_col),
     ('intercept'       , intercept_col),
     ('inlier_log_var'  , inlier_log_var_col),
