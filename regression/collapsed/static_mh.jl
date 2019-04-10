@@ -39,8 +39,8 @@ data = Map(dummy_two_normal)
     slope = @trace(normal(0, 2), :slope)
     intercept = @trace(normal(0, 2), :intercept)
     means = broadcast(+, slope * xs, intercept)
-    inlier_stds = fill(exp(inlier_std), n)
-    outlier_stds = fill(exp(outlier_std), n)
+    inlier_stds = fill(sqrt(exp(inlier_std)), n)
+    outlier_stds = fill(sqrt(exp(outlier_std)), n)
     ys = @trace(data(means, inlier_stds, outlier_stds), :data)
     return ys
 end
