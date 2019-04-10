@@ -34,13 +34,13 @@ data = Map(dummy_two_normal)
 
 @gen (static) function model(xs::Vector{Float64})
     n = length(xs)
-    inlier_std = @trace(normal(0, 1), :inlier_std)
-    outlier_std = @trace(normal(0, 1), :outlier_std)
+    inlier_log_var = @trace(normal(0, 1), :inlier_log_var)
+    outlier_log_var = @trace(normal(0, 1), :outlier_log_var)
     slope = @trace(normal(0, 2), :slope)
     intercept = @trace(normal(0, 2), :intercept)
     means = broadcast(+, slope * xs, intercept)
-    inlier_stds = fill(sqrt(exp(inlier_std)), n)
-    outlier_stds = fill(sqrt(exp(outlier_std)), n)
+    inlier_stds = fill(sqrt(exp(inlier_log_var)), n)
+    outlier_stds = fill(sqrt(exp(outlier_log_var)), n)
     ys = @trace(data(means, inlier_stds, outlier_stds), :data)
     return ys
 end
@@ -59,14 +59,14 @@ end
     @trace(normal(intercept, .5), :intercept)
 end
 
-@gen (static) function inlier_std_proposal(prev)
-    inlier_std = prev[:inlier_std]
-    @trace(normal(inlier_std, .5), :inlier_std)
+@gen (static) function inlier_log_var_proposal(prev)
+    inlier_log_var = prev[:inlier_log_var]
+    @trace(normal(inlier_log_var, .5), :inlier_log_var)
 end
 
-@gen (static) function outlier_std_proposal(prev)
-    outlier_std = prev[:outlier_std]
-    @trace(normal(outlier_std, .5), :outlier_std)
+@gen (static) function outlier_log_var_proposal(prev)
+    outlier_log_var = prev[:outlier_log_var]
+    @trace(normal(outlier_log_var, .5), :outlier_log_var)
 end
 
 function logsumexp(arr)
@@ -96,16 +96,16 @@ function do_inference(n)
         # steps on the parameters
         (trace, _accept) = mh(trace, slope_proposal, ())
         (trace, _accept) = mh(trace, intercept_proposal, ())
-        (trace, _accept) = mh(trace, inlier_std_proposal, ())
-        (trace, _accept) = mh(trace, outlier_std_proposal, ())
+        (trace, _accept) = mh(trace, inlier_log_var_proposal, ())
+        (trace, _accept) = mh(trace, outlier_log_var_proposal, ())
         elapsed = time() - start
         runtime += elapsed
 
         score = get_score(trace)
 		println((
-            i, score,
-            trace[:inlier_std],
-            trace[:outlier_std],
+            i, runtime, score,
+            sqrt(exp(trace[:inlier_log_var])),
+            sqrt(exp(trace[:outlier_log_var])),
             trace[:slope],
             trace[:intercept]))
     end
@@ -117,8 +117,8 @@ function do_inference(n)
         score,
         trace[:slope],
         trace[:intercept],
-        trace[:inlier_std],
-        trace[:outlier_std],
+        trace[:inlier_log_var],
+        trace[:outlier_log_var],
         )
 end
 
