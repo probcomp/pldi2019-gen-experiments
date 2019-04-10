@@ -134,12 +134,12 @@
       (println (str i "," (* (inc i) (/ (:per-step result) 1e3)) "," (:slope trace) "," (:intercept trace) "," (:inlier-std-choice trace) ","
         (:outlier-std-choice trace))))))
 
-(def num-steps 200)
-(def num-experiments 1)
+(def num-steps 2000)
+(def num-experiments 2)
 (defn experiment []
+  (println "num_steps,runtime,score,slope,intercept,inlier_log_var,outlier_log_var")
   (doseq [i (range num-experiments)]
     ;(println (str "Lightweight MH for " n-steps " steps (collapsed) - iterate " i))
-    (println "num_steps,runtime,score,slope,intercept,inlier_log_var,outlier_log_var")
     (process-lmh-to-csv-rows num-steps
       (run-lmh regress-collapsed regress-collapsed-score num-steps))))
   ; (println "Lightweight MH for 1000 steps (collapsed)")
