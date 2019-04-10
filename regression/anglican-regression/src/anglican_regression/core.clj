@@ -122,24 +122,25 @@
 (defn run-lmh [model scorer steps]
 	 (let [start (System/nanoTime)
 	       results (doall (take steps (map :result (doquery :lmh model [xs ys]))))
-	       elapsed (double (/ (- (System/nanoTime) start) 1e6))]
+	       elapsed (double (/ (- (System/nanoTime) start) 1e6))
+	       ]
 	   {:elapsed elapsed
 	   	:per-step (/ elapsed steps)
 	   	:traces (map-indexed #(score-trace scorer %2 %1) results)}))
 
-(defn process-lmh-to-csv-row [steps result]
-  (let [last-trace (last (:traces result))]
-  (str steps "," (:elapsed result) "," (:slope last-trace) "," (:intercept last-trace) "," (:inlier-std-choice last-trace) ","
-     (:outlier-std-choice last-trace))))
+(defn process-lmh-to-csv-rows [steps result]
+  (doseq [i (range steps)]
+    (let [trace (nth (:traces result) i)]
+      (println (str i "," (* (inc i) (:per-step result)) "," (:slope trace) "," (:intercept trace) "," (sqrt (exp (:inlier-std-choice trace))) "," 
+        (sqrt (exp (:outlier-std-choice trace))))))))
 
-(def num-steps-settings [1 5 10 15 20 25 30 50 100 300 500 1000 2000])
-(def num-experiments-per-num-steps 1)
+(def num-steps 2000)
+(def num-experiments 1)
 (defn experiment [] 
-		(doseq [n-steps num-steps-settings
-										i (range num-experiments-per-num-steps)]
+		(doseq [i (range num-experiments)]
 				;(println (str "Lightweight MH for " n-steps " steps (collapsed) - iterate " i))
 				(println "iters,time-in-ms,slope,intercept,inlier-std,outlier-std")
-  		(println (process-lmh-to-csv-row n-steps 
-  		  (run-lmh regress-collapsed regress-collapsed-score n-steps)))))
+  		(process-lmh-to-csv-rows num-steps 
+  		  (run-lmh regress-collapsed regress-collapsed-score num-steps))))
   ; (println "Lightweight MH for 1000 steps (collapsed)")
   ; (pprint (run-lmh regress-collapsed regress-collapsed-score 1000)))
