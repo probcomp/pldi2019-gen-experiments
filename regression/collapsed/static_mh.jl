@@ -132,9 +132,9 @@ open(fname, "w") do f
     write(f, join(header, ',') * '\n')
 end
 
-num_reps = 2
+num_reps = 5
 for i in 1:num_reps
-    results = do_inference(100)
+    results = do_inference(1000)
     open(fname, "a") do f
         for row in results
             write(f, join(row, ',') * '\n')
