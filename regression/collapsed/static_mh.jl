@@ -90,6 +90,8 @@ function do_inference(n)
     # initial trace
     (trace, weight) = generate(model, (xs,), observations)
 
+    results = []
+
     runtime = 0
     for i=1:n
         start = time()
@@ -98,28 +100,23 @@ function do_inference(n)
         (trace, _accept) = mh(trace, intercept_proposal, ())
         (trace, _accept) = mh(trace, inlier_log_var_proposal, ())
         (trace, _accept) = mh(trace, outlier_log_var_proposal, ())
+        # record runtime
         elapsed = time() - start
         runtime += elapsed
-
-        score = get_score(trace)
-		println((
-            i, runtime, score,
-            sqrt(exp(trace[:inlier_log_var])),
-            sqrt(exp(trace[:outlier_log_var])),
+        # update stats
+        stats = (
+            i,
+            runtime,
+            get_score(trace),
             trace[:slope],
-            trace[:intercept]))
+            trace[:intercept],
+            trace[:inlier_log_var],
+            trace[:outlier_log_var],)
+        push!(results, stats)
+		println(stats)
     end
 
-    score = get_score(trace)
-    return (
-        n,
-        runtime,
-        score,
-        trace[:slope],
-        trace[:intercept],
-        trace[:inlier_log_var],
-        trace[:outlier_log_var],
-        )
+    return results
 end
 
 #################
@@ -128,8 +125,19 @@ end
 
 do_inference(10)
 
-results = do_inference(200)
 fname = "static_mh.results.csv"
-open(fname, "a") do f
-    write(f, join(results, ',') * '\n')
+header=["num_steps", "runtime", "score", "slope",
+    "intercept", "inlier_log_var", "outlier_log_var"]
+open(fname, "w") do f
+    write(f, join(header, ',') * '\n')
+end
+
+num_reps = 2
+for i in 1:num_reps
+    results = do_inference(100)
+    open(fname, "a") do f
+        for row in results
+            write(f, join(row, ',') * '\n')
+        end
+    end
 end
