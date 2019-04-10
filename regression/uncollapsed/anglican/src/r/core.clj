@@ -11,7 +11,7 @@
 
 ;; Load xs and ys from train.csv
 (def data
-  (with-open [in-file (io/reader "../train.csv")]
+  (with-open [in-file (io/reader "../../train.csv")]
     (doall
       (csv/read-csv in-file))))
 
