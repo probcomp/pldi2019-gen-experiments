@@ -31,8 +31,7 @@ outlier_log_var_col = []
 runtime_col = []
 prob_outlier_col = []
 
-# steps = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
-steps=[100]
+steps = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 for num_iters in steps:
     print 'num_iters: %s' % (num_iters,)
     for rep in range(num_reps):
@@ -59,4 +58,4 @@ results = pd.DataFrame(OrderedDict([
     ('inlier_log_var'  , inlier_log_var_col),
     ('outlier_log_var' , outlier_log_var_col),
 ]))
-results.to_csv('./stan.results.csv', index=False, header=False)
+results.to_csv('./stan.results.csv', index=False, header=True)
