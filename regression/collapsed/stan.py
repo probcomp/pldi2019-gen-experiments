@@ -1,20 +1,17 @@
-import os
 import pickle
 import time
 
-import pandas as pd
-
 from collections import OrderedDict
 
-os.system('mkdir -p ./tmp')
+import pandas as pd
 
 # Uncomment this code to recompile the Stan model and save it to disk.
 # import pystan
 # model = pystan.StanModel(file='./model.stan')
-# with open('./tmp/model.stan.pkl', 'wb') as f:
+# with open('./model.stan.pkl', 'wb') as f:
 #     pickle.dump(model, f)
 
-with open('./tmp/model.stan.pkl', 'rb') as f:
+with open('./model.stan.pkl', 'rb') as f:
     model = pickle.load(f)
 
 prob_outlier = 0.5
@@ -39,7 +36,7 @@ steps=[100]
 for num_iters in steps:
     print 'num_iters: %s' % (num_iters,)
     for rep in range(num_reps):
-        fname = './tmp/samples_%s_%s.txt' % (num_iters, rep)
+        fname = '/tmp/samples_%s_%s.txt' % (num_iters, rep)
         start = time.time()
         model.sampling(data=data, iter=num_iters, chains=1, sample_file=fname, verbose=False)
         runtime = time.time() - start
