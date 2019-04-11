@@ -121,7 +121,7 @@
 
 (defn run-lmh [model scorer steps]
   (let [start (System/nanoTime)
-        results (doall (take steps (map :result (doquery :lmh model [xs ys]))))
+        results (doall (take steps (map :result (doquery :rmh model [xs ys]))))
         elapsed (double (/ (- (System/nanoTime) start) 1e6))
         ]
     {:elapsed elapsed
