@@ -1,5 +1,6 @@
 using Turing
 using Statistics: median, mean
+import JSON
 
 include("../geometry.jl")
 
@@ -56,30 +57,34 @@ end
 import Random
 Random.seed!(1)
 
-num_reps = 100
-const num_particles_list = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 1000, 2000, 3000]
-results = Dict()
-for num_particles in num_particles_list
-    ess_threshold = num_particles / 2
-    elapsed = Vector{Float64}(undef, num_reps)
-    lmls = Vector{Float64}(undef, num_reps)
-    for rep=1:num_reps
-        start = time_ns()
+function experiment(num_reps::Int, num_particles_list::Vector{Int})
+    results = Dict()
+    for num_particles in num_particles_list
+        ess_threshold = num_particles / 2
+        elapsed = Vector{Float64}(undef, num_reps)
+        lmls = Vector{Float64}(undef, num_reps)
+        for rep=1:num_reps
+            start = time_ns()
+        
+            # run the particle filter
+            lml = turing_pf(num_particles)
     
-        # run the particle filter
-        lml = turing_pf(num_particles)
-
-        # record results
-        elapsed[rep] = Int(time_ns() - start) / 1e9
-        lmls[rep] = lml
+            # record results
+            elapsed[rep] = Int(time_ns() - start) / 1e9
+            lmls[rep] = lml
+        end
+        results[num_particles] = Dict("lmls" => lmls, "elapsed" => elapsed)
+        println(mean(lmls))
     end
-    results[num_particles] = Dict("lmls" => lmls, "elapsed" => elapsed)
-    println(mean(lmls))
+    open("turing_results.json","w") do f
+        JSON.print(f, results, 4)
+    end
 end
 
-println(results)
-import JSON
+# intitial run..
+println("initial run..")
+experiment(25, [1, 2, 3, 5, 7, 10])
 
-open("turing_results.json","w") do f
-    JSON.print(f, results, 4)
-end
+# final run..
+println("final run..")
+experiment(100, [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 1000, 2000, 3000])

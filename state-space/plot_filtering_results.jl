@@ -1,36 +1,25 @@
-using Statistics: median, mean, std
+using Statistics: median, mean, std, quantile
 using PyPlot
 using Printf: @sprintf
 import JSON
 
-function print_runtimes(num_particles_list::Vector{Int}, results::Dict, label::String)
-    median_times = [median(results[num_particles][2]) for num_particles in num_particles_list]
-    stdev_times = [std(results[num_particles][2]) for num_particles in num_particles_list]
-    for (num_particles, median_time, stdev_time) in zip(num_particles_list, median_times, stdev_times)
-        str = @sprintf("%s, %d particles: %0.3f +/- %0.3f", label, num_particles, median_time, stdev_time)
-        println(str)
-    end
+function mean_iqr(arr)
+    m = median(arr)
+    l = quantile(arr, 0.25)
+    u = quantile(arr, 0.75)
+    @assert u >= m
+    @assert m >= l
+    mean([u - m, m - l])
 end
 
 function plot_results(num_particles_list::Vector{Int}, results::Dict, label::String,
             color::String, linestyle="-")
-    println(keys(results))
     median_times = [median(results[string(num_particles)]["elapsed"]) for num_particles in num_particles_list]
-    stdev_times = [std(results[string(num_particles)]["elapsed"]) for num_particles in num_particles_list]
     mean_lmls = [mean(results[string(num_particles)]["lmls"]) for num_particles in num_particles_list]
-    stdev_lmls = [std(results[string(num_particles)]["lmls"]) for num_particles in num_particles_list]
-    println("min: $(minimum(mean_lmls)))")
-    println("max: $(maximum(mean_lmls)))")
     plot(median_times, mean_lmls, 
 	    color=color,
 	    label=label,
         linestyle=linestyle)
-    #for i=1:length(num_particles_list)
-        #t = median_times[i]
-        #l = mean_lmls[i]
-        #num_particles = num_particles_list[i]
-        #text(t, l, "$num_particles")
-    #end
 end
 
 function print_crossing_point(num_particles_list::Vector{Int}, results::Dict, threshold::Real, name::String)
@@ -47,10 +36,13 @@ function print_crossing_point(num_particles_list::Vector{Int}, results::Dict, th
     if !success
         chosen_num_particles = maximum(num_particles_list)
     end
-    median_elapsed = median(results[string(chosen_num_particles)]["elapsed"])
+    elapsed = results[string(chosen_num_particles)]["elapsed"] * 1000 # sec. to ms.
+    median_elapsed = median(elapsed)
+    mean_iqr_elapsed = mean_iqr(elapsed)
     mean_lml = mean(results[string(chosen_num_particles)]["lmls"])
-    std_lml = std(results[string(chosen_num_particles)]["lmls"])
-    println("$name, $(success ? "" : ">") $chosen_num_particles particles, median elapsed: $median_elapsed, mean_lml: $mean_lml, +/-: $std_lml")
+    str = @sprintf("%s, %s %d particles: %0.3fms (+/- %0.3f), mean lml: %0.3f", name, success ? "" : ">", chosen_num_particles,
+            median_elapsed, mean_iqr_elapsed, mean_lml)
+    println(str)
 end
 
 
@@ -75,16 +67,23 @@ gold_standard = mean(gen_results_lightweight_unfold_custom_proposal["3000"]["lml
 println("gold_standard: $gold_standard")
 
 # print the runtime to cross the accuracy threshold
-
 threshold = 56
 print_crossing_point(turing_num_particles_list, turing_results, threshold, "Turing")
 print_crossing_point(anglican_num_particles_list, anglican_results, threshold, "Anglican")
 print_crossing_point(gen_num_particles_list, gen_results_lightweight_unfold_default_proposal, threshold, "Gen (Default Proposal)")
 print_crossing_point(gen_num_particles_list, gen_results_lightweight_unfold_custom_proposal, threshold, "Gen (Custom Proposal)")
-print_crossing_point(venture_num_particles_list, venture_results, threshold, "Venture")
+
+# NOTE: for Venture, there seems to be a bug.
+# since the algorithm is the same as the Anglican algorithm (default proposal,
+# resampling at every step), which reaches the threshold after 200 particles,
+# we will use the time measurements for Venture with 100 particles, and state >
+# X where X is that time.
+venture_elapsed = venture_results["100"]["elapsed"] * 1000 # sec. to ms.
+median_elapsed = median(venture_elapsed)
+mean_iqr_elapsed = mean_iqr(venture_elapsed)
+println("Venture: > $median_elapsed (+/- $mean_iqr_elapsed)")
 
 # plot time accuracy curve
-
 figure(figsize=(2.75,2.5))
 plot_results(gen_num_particles_list, gen_results_lightweight_unfold_custom_proposal, "Gen (custom)", "red", "--")
 plot_results(gen_num_particles_list, gen_results_lightweight_unfold_default_proposal, "Gen (generic)", "red", "-")

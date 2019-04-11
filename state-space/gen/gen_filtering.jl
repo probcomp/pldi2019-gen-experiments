@@ -79,6 +79,7 @@ function evaluate_particle_filter(pf::Function, params::Params,
 
     results = Dict()
     for num_particles in num_particles_list
+        println("num_particles: $num_particles")
         ess_threshold = num_particles / 2
         elapsed = Vector{Float64}(undef, num_reps)
         lmls = Vector{Float64}(undef, num_reps)
@@ -365,7 +366,7 @@ end
 static_fancy_proposal_step = call_at(static_fancy_proposal_step_inner, Int)
 
 
-function static_unfold_custom_proposal_pf(measured_xs, measured_ys,
+function static_custom_proposal_pf(measured_xs, measured_ys,
             num_particles, precomputed, path, times, speed, noise, dist_slack)
     ess_threshold = num_particles / 2
     init_obs = choicemap()
@@ -598,7 +599,7 @@ function write_json_results(results, fname::AbstractString)
     end
 end
 
-function experiment()
+function experiment(num_particles_list::Vector{Int}, num_reps::Int)
 
     Random.seed!(0)
 
@@ -608,26 +609,22 @@ function experiment()
     
     params = Params(times, speed, dist_slack, noise, path)
 
-    # parameters for particle filtering
-    num_particles_list = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 1000, 2000, 3000]
-    num_reps = 100
-
     # experiments with static model
     write_json_results(
         evaluate_particle_filter(static_default_proposal_pf, params, measured_xs, measured_ys, num_particles_list, num_reps),
         "gen_results_static_default_proposal.json")
 
-    write_json_results(evaluate_particle_filter(static_unfold_custom_proposal_pf, params, measured_xs, measured_ys, num_particles_list, num_reps),
+    write_json_results(evaluate_particle_filter(static_custom_proposal_pf, params, measured_xs, measured_ys, num_particles_list, num_reps),
         "gen_results_static_custom_proposal.json")
 
     # experiments with lightweight model (no unfold)
-    write_json_results(
-        evaluate_particle_filter(lightweight_default_proposal_pf, params, measured_xs, measured_ys, num_particles_list, num_reps),
-        "gen_results_lightweight_default_proposal.json")
+    #write_json_results(
+        #evaluate_particle_filter(lightweight_default_proposal_pf, params, measured_xs, measured_ys, num_particles_list, num_reps),
+        #"gen_results_lightweight_default_proposal.json")
 
-    write_json_results(
-        evaluate_particle_filter(lightweight_custom_proposal_pf, params, measured_xs, measured_ys, num_particles_list, num_reps),
-        "gen_results_lightweight_custom_proposal.json")
+    #write_json_results(
+        #evaluate_particle_filter(lightweight_custom_proposal_pf, params, measured_xs, measured_ys, num_particles_list, num_reps),
+        #"gen_results_lightweight_custom_proposal.json")
 
     # experiments with unfold
     write_json_results(
@@ -644,4 +641,15 @@ end
 Gen.load_generated_functions()
 
 show_prior_samples()
-experiment()
+
+# initial run
+println("initial run...")
+experiment(
+    [1, 2, 3, 5, 7, 10, 15],
+    50)
+
+# final run
+println("final run...")
+experiment(
+    [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 1000, 2000, 3000],
+    100)
