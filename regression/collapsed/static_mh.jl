@@ -91,7 +91,6 @@ function do_inference(n)
     (trace, weight) = generate(model, (xs,), observations)
 
     results = []
-
     runtime = 0
     for i=1:n
         start = time()
