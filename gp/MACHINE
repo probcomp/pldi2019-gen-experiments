@@ -1,0 +1,16 @@
+These experiments were all executed on probcomp-1.csail.mit.edu
+
+processor       : 1--64
+vendor_id       : AuthenticAMD
+cpu family      : 21
+model           : 2
+model name      : AMD Opteron(tm) Processor 6376
+stepping        : 0
+microcode       : 0x6000852
+cpu MHz         : 1400.000
+cache size      : 2048 KB
+
+Distributor ID: Ubuntu
+Description:    Ubuntu 16.04.6 LTS
+Release:    16.04
+Codename:   xenial
