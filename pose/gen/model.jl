@@ -165,5 +165,3 @@ const renderer = BodyPoseDepthRenderer(width, height, blender, blender_model, po
     observable = @trace(noisy_matrix(blurred, 0.1), :image)
     return (image, blurred, observable)
 end
-
-
