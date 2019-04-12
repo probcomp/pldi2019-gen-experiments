@@ -1,36 +1,8 @@
 using Gen
-using DataFrames: DataFrame
 
-#############
-# body pose #
-#############
+# depends on: pose.jl, renderer.jl
 
-struct Point3
-    x::Float64
-    y::Float64
-    z::Float64
-end
-
-Point3(tup::Tuple{U,U,U}) where {U<:Real} = Point3(tup[1], tup[2], tup[3])
-
-Base.:+(a::Point3, b::Point3) = Point3(a.x + b.x, a.y + b.y, a.z + b.z)
-Base.:-(a::Point3, b::Point3) = Point3(a.x - b.x, a.y - b.y, a.z - b.z)
-Base.norm(a::Point3) = sqrt(a.x * a.x + a.y * a.y + a.z * a.z)
-
-tup(point::Point3) = (point.x, point.y, point.z)
-
-struct BodyPose
-    rotation::Point3
-    elbow_r_loc::Point3
-    elbow_l_loc::Point3
-    elbow_r_rot::Point3
-    elbow_l_rot::Point3
-    hip_loc::Point3
-    heel_r_loc::Point3
-    heel_l_loc::Point3
-end
-
-function BodyPose(choices::ChoiceTrie)
+function BodyPose(choices::ChoiceMap)
     rot_z = choices[:rot_z]
     rotation = scale_rot(rot_z)
     elbow_r_loc_x = choices[:elbow_r_loc_x]
@@ -64,18 +36,6 @@ function BodyPose(choices::ChoiceTrie)
         hip_loc,
         heel_r_loc,
         heel_l_loc)
-end
-
-function Base.:+(a::BodyPose, b::BodyPose)
-    BodyPose(
-        a.rotation + b.rotation,
-        a.elbow_r_loc + b.elbow_r_loc,
-        a.elbow_l_loc + b.elbow_l_loc,
-        a.elbow_r_rot + b.elbow_r_rot,
-        a.elbow_l_rot + b.elbow_l_rot,
-        a.hip_loc + b.hip_loc,
-        a.heel_r_loc + b.heel_r_loc,
-        a.heel_l_loc + b.heel_l_loc)
 end
 
 ###############
@@ -113,44 +73,44 @@ unscale_heel_l_loc(pt::Point3) = (unscale(pt.x, -0.1, 0.45), unscale(pt.y, -1, 0
 @gen function body_pose_model()
 
     # global rotation
-    rotation_x::Float64 = @trace(uniform(0, 1), :rot_z)
-    rotation::Point3 = scale_rot(rotation_x)
+    rotation_x = @trace(uniform(0, 1), :rot_z)
+    rotation = scale_rot(rotation_x)
 
     # right elbow location
-    elbow_r_loc_x::Float64 = @trace(uniform(0, 1), :elbow_r_loc_x)
-    elbow_r_loc_y::Float64 = @trace(uniform(0, 1), :elbow_r_loc_y)
-    elbow_r_loc_z::Float64 = @trace(uniform(0, 1), :elbow_r_loc_z)
-    elbow_r_loc::Point3 = scale_elbow_r_loc(elbow_r_loc_x, elbow_r_loc_y, elbow_r_loc_z)
+    elbow_r_loc_x = @trace(uniform(0, 1), :elbow_r_loc_x)
+    elbow_r_loc_y = @trace(uniform(0, 1), :elbow_r_loc_y)
+    elbow_r_loc_z = @trace(uniform(0, 1), :elbow_r_loc_z)
+    elbow_r_loc = scale_elbow_r_loc(elbow_r_loc_x, elbow_r_loc_y, elbow_r_loc_z)
     
     # left elbow location
-    elbow_l_loc_x::Float64 = @trace(uniform(0, 1), :elbow_l_loc_x)
-    elbow_l_loc_y::Float64 = @trace(uniform(0, 1), :elbow_l_loc_y)
-    elbow_l_loc_z::Float64 = @trace(uniform(0, 1), :elbow_l_loc_z)
-    elbow_l_loc::Point3 = scale_elbow_l_loc(elbow_l_loc_x, elbow_l_loc_y, elbow_l_loc_z)
+    elbow_l_loc_x = @trace(uniform(0, 1), :elbow_l_loc_x)
+    elbow_l_loc_y = @trace(uniform(0, 1), :elbow_l_loc_y)
+    elbow_l_loc_z = @trace(uniform(0, 1), :elbow_l_loc_z)
+    elbow_l_loc = scale_elbow_l_loc(elbow_l_loc_x, elbow_l_loc_y, elbow_l_loc_z)
 
     # right elbow rotation
-    elbow_r_rot_z::Float64 = @trace(uniform(0, 1), :elbow_r_rot_z)
-    elbow_r_rot::Point3 = scale_elbow_r_rot(elbow_r_rot_z)
+    elbow_r_rot_z = @trace(uniform(0, 1), :elbow_r_rot_z)
+    elbow_r_rot = scale_elbow_r_rot(elbow_r_rot_z)
 
     # left elbow rotation
-    elbow_l_rot_z::Float64 = @trace(uniform(0, 1), :elbow_l_rot_z)
-    elbow_l_rot::Point3 = scale_elbow_l_rot(elbow_l_rot_z)
+    elbow_l_rot_z = @trace(uniform(0, 1), :elbow_l_rot_z)
+    elbow_l_rot = scale_elbow_l_rot(elbow_l_rot_z)
 
     # hip
-    hip_loc_z::Float64 = @trace(uniform(0, 1), :hip_loc_z)
-    hip_loc::Point3 = scale_hip_loc(hip_loc_z)
+    hip_loc_z = @trace(uniform(0, 1), :hip_loc_z)
+    hip_loc = scale_hip_loc(hip_loc_z)
 
     # right heel
-    heel_r_loc_x::Float64 = @trace(uniform(0, 1), :heel_r_loc_x)
-    heel_r_loc_y::Float64 = @trace(uniform(0, 1), :heel_r_loc_y)
-    heel_r_loc_z::Float64 = @trace(uniform(0, 1), :heel_r_loc_z)
-    heel_r_loc::Point3 = scale_heel_r_loc(heel_r_loc_x, heel_r_loc_y, heel_r_loc_z)
+    heel_r_loc_x = @trace(uniform(0, 1), :heel_r_loc_x)
+    heel_r_loc_y = @trace(uniform(0, 1), :heel_r_loc_y)
+    heel_r_loc_z = @trace(uniform(0, 1), :heel_r_loc_z)
+    heel_r_loc = scale_heel_r_loc(heel_r_loc_x, heel_r_loc_y, heel_r_loc_z)
 
     # left heel
-    heel_l_loc_x::Float64 = @trace(uniform(0, 1), :heel_l_loc_x)
-    heel_l_loc_y::Float64 = @trace(uniform(0, 1), :heel_l_loc_y)
-    heel_l_loc_z::Float64 = @trace(uniform(0, 1), :heel_l_loc_z)
-    heel_l_loc::Point3 = scale_heel_l_loc(heel_l_loc_x, heel_l_loc_y, heel_l_loc_z)
+    heel_l_loc_x = @trace(uniform(0, 1), :heel_l_loc_x)
+    heel_l_loc_y = @trace(uniform(0, 1), :heel_l_loc_y)
+    heel_l_loc_z = @trace(uniform(0, 1), :heel_l_loc_z)
+    heel_l_loc = scale_heel_l_loc(heel_l_loc_x, heel_l_loc_y, heel_l_loc_z)
 
     return BodyPose(
         rotation,
@@ -160,21 +120,14 @@ unscale_heel_l_loc(pt::Point3) = (unscale(pt.x, -0.1, 0.45), unscale(pt.y, -1, 0
         elbow_l_rot,
         hip_loc,
         heel_r_loc,
-        heel_l_loc)::BodyPose
+        heel_l_loc)
 end
 
-struct BodyPoseSceneModel end
-
-function sample(::BodyPoseSceneModel)
-    trace = simulate(body_pose_model, ())
-    return get_call_record(trace).retval::BodyPose
-end
-
-#############################
-# combined generative model #
-#############################
-
-include("../renderer.jl")
+# dimension of the image
+#const width = 128
+#const height = 128
+const width = 64
+const height = 64
 
 struct NoisyMatrix <: Gen.Distribution{Matrix{Float64}} end
 
@@ -202,7 +155,8 @@ end
 
 const blender = "blender"
 const blender_model = "HumanKTH.decimated.blend"
-const renderer = BodyPoseDepthRenderer(width, height, blender, model, port)
+const port = 62000
+const renderer = BodyPoseDepthRenderer(width, height, blender, blender_model, port)
 
 @gen function generative_model()
     pose = @trace(body_pose_model(), :pose)
@@ -212,5 +166,4 @@ const renderer = BodyPoseDepthRenderer(width, height, blender, model, port)
     return (image, blurred, observable)
 end
 
-const width = 128
-const height = 128
+
