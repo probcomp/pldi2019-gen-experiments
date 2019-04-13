@@ -131,7 +131,7 @@ const height = 64
 
 struct NoisyMatrix <: Gen.Distribution{Matrix{Float64}} end
 
-const noisy_matrix = NoisyMatrix()
+const pixel_noise = NoisyMatrix()
 
 function Gen.logpdf(::NoisyMatrix, x::Matrix{Float64}, mu::Matrix{U}, noise::T) where {U<:Real,T<:Real}
     var = noise * noise
@@ -158,10 +158,18 @@ const blender_model = "HumanKTH.decimated.blend"
 const port = 62000
 const renderer = BodyPoseDepthRenderer(width, height, blender, blender_model, port)
 
+function render_depth_image(pose)
+    render(renderer, pose)
+end
+
+function gaussian_blur(image)
+    imfilter(image, Kernel.gaussian(1))
+end
+
 @gen function generative_model()
     pose = @trace(body_pose_model(), :pose)
-    image = render(renderer, pose)
-    blurred = imfilter(image, Kernel.gaussian(1))
-    observable = @trace(noisy_matrix(blurred, 0.1), :image)
+    image = render_depth_image(pose)
+    blurred = gaussian_blur(image)
+    observable = @trace(pixel_noise(blurred, 0.1), :image)
     return (image, blurred, observable)
 end
