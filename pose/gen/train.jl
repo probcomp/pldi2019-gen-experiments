@@ -36,7 +36,8 @@ function train_inference_network(num_epoch::Int, epoch_size::Int,
             minibatch_idx = Random.randperm(epoch_size)[1:minibatch_size]
             minibatch_examples = training_examples[minibatch_idx]
             images = Matrix{Float64}[cm[:image] for cm in minibatch_examples]
-            constraints = vectorize_internal([get_submap(cm, :pose) for cm in minibatch_examples])
+            constraints = choicemap()
+            set_submap!(constraints, :poses, vectorize_internal([get_submap(cm, :pose) for cm in minibatch_examples]))
             (trace, weight) = generate(proposal_batched, (images,), constraints)
             
             # increments gradient accumulators for batched proposal
