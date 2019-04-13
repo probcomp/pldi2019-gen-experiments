@@ -1,5 +1,7 @@
 [deps]
+FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
 Gen = "ea4f424c-a589-11e8-07c0-fd5c91b9da4a"
 GenTF = "1956f2fc-1631-11e9-1597-3d3589996c0f"
+ImageFiltering = "6a3955dd-da59-5b1f-98d4-e7296123deb5"
 ImageMagick = "6218d12a-5da1-5696-b52f-db25d2ecc6d1"
 PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
