@@ -124,10 +124,8 @@ unscale_heel_l_loc(pt::Point3) = (unscale(pt.x, -0.1, 0.45), unscale(pt.y, -1, 0
 end
 
 # dimension of the image
-#const width = 128
-#const height = 128
-const width = 64
-const height = 64
+const width = 128
+const height = 128
 
 struct NoisyMatrix <: Gen.Distribution{Matrix{Float64}} end
 

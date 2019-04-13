@@ -36,8 +36,7 @@ struct NetworkArchitecture
     num_fc::Int
 end
 
-const arch = NetworkArchitecture(8, 8, 16, 128)
-#const arch = NetworkArchitecture(32, 32, 64, 1024)
+const arch = NetworkArchitecture(32, 32, 64, 1024)
 
 images = tf.placeholder(tf.float64) # N x width x height
 images_reshaped = tf.reshape(images, [-1, width, height, 1])
