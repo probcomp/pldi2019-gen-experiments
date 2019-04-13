@@ -6,7 +6,7 @@ include("proposal.jl")
 # load the TF neural net parameters from disk
 sess = get_session(net)
 saver = train.Saver()
-saver.restore(sess, "net.ckpt")
+saver.restore(sess, "./net.ckpt")
 
 
 # generate test examples (choice maps)

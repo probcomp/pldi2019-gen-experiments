@@ -50,9 +50,9 @@ function train_inference_network(num_epoch::Int, epoch_size::Int,
         # save TF parameters for the network to disk
         sess = get_session(net)
         saver = train.Saver()
-        saver.save(sess, "net.ckpt")
+        saver.save(sess, "./net.ckpt")
     end
 end
 
-# do a little training..
-train_inference_network(100, 100, 100, 50)
+# train it
+train_inference_network(100000, 1000, 300, 100)
