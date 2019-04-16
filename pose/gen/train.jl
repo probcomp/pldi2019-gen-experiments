@@ -56,5 +56,4 @@ function train_inference_network(num_epoch::Int, epoch_size::Int,
 end
 
 # train it
-train_inference_network(100000, 100, 30, 10)
-#train_inference_network(100000, 100, 300, 100)
+train_inference_network(100000, 10000, 300, 100)
