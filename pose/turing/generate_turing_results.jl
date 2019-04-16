@@ -234,7 +234,7 @@ function do_experiment(reps::Int)
     for i=1:reps
         println("i: $i")
         start = time_ns() / 1e9
-        (pose, _) = do_inference(60)
+        (pose, _) = do_inference(12)
         elapsed = (time_ns() /1e9 - start)
         push!(runtimes, elapsed)
         push!(poses, pose)
