@@ -1,8 +1,9 @@
 using Turing
 import Random
 import Distributions
-import ImageCore
+using Images: ImageCore
 import FileIO
+import JSON
 
 Random.seed!(1)
 
@@ -77,7 +78,7 @@ function Base.:+(a::BodyPose, b::BodyPose)
         a.heel_l_loc + b.heel_l_loc)
 end
 
-include("renderer.jl")
+include("../renderer.jl")
 
 ###############
 # scene prior #
@@ -111,11 +112,12 @@ unscale_heel_r_loc(pt::Point3) = (unscale(pt.x, -0.45, 0.1), unscale(pt.y, -1, 0
 scale_heel_l_loc(x, y, z) = Point3(scale(x, -0.1, 0.45), scale(y, -1, 0.5), scale(z, -0.2, 0.2))
 unscale_heel_l_loc(pt::Point3) = (unscale(pt.x, -0.1, 0.45), unscale(pt.y, -1, 0.5), unscale(pt.z, -0.2, 0.2))
 
-const blender = "blender"
 const width = 128
 const height = 128
-const renderer = BodyPoseDepthRenderer(width, height, blender, "HumanKTH.decimated.blend", 59897)
-const wireframe_renderer = BodyPoseWireframeRenderer(400, 400, blender, "HumanKTH.decimated.blend", 59898)
+const blender = "blender"
+const blender_model = "HumanKTH.decimated.blend"
+const renderer = BodyPoseDepthRenderer(width, height, blender, blender_model, 62000)
+const wireframe_renderer = BodyPoseWireframeRenderer(400, 400, blender, blender_model, 62001)
 
 @model model(observed_image) = begin
 
@@ -182,7 +184,7 @@ function logsumexp(arr::AbstractArray{T}) where {T <: Real}
 end
 
 # load the test image
-observed_image = convert(Matrix{Float64}, FileIO.load("observed.png"))
+observed_image = convert(Matrix{Float64}, FileIO.load("../gen/image.png"))
 something = model(observed_image)
 
 function get_pose(sample::Turing.Sample)
@@ -221,34 +223,37 @@ function do_inference(n)
     weights = exp.(log_normalized_weights)
     dist = Distributions.Categorical(weights)
     idx = rand(dist)
-    println("picked idx: $idx")
     sample = samples[idx]
     pose = get_pose(sample)
     return (pose, samples)
 end
 
-for i=1:4
-    println("i: $i")
-    start = time_ns() / 1e9
-    (pose, _) = do_inference(5000)
-    elapsed = (time_ns() /1e9 - start)
-    wireframe = render(wireframe_renderer, pose)
-    FileIO.save("wireframe-$i.png", map(ImageCore.clamp01, wireframe))
-    println("elapsed (sec.): $elapsed")
+function do_experiment(reps::Int)
+    runtimes = []
+    poses = []
+    for i=1:reps
+        println("i: $i")
+        start = time_ns() / 1e9
+        (pose, _) = do_inference(60)
+        elapsed = (time_ns() /1e9 - start)
+        push!(runtimes, elapsed)
+        push!(poses, pose)
+        wireframe = render(wireframe_renderer, pose)
+        FileIO.save("wireframe-$i.png", map(ImageCore.clamp01, wireframe))
+        println("elapsed (sec.): $elapsed")
+    end
+    open("turing_results.json", "w") do f
+        write(f, JSON.json(Dict(:elapsed => runtimes, :pose => poses)))
+    end
+
+    l = quantile(runtimes, 0.25)
+    m = median(runtimes)
+    u = quantile(runtimes, 0.75)
+    println("runtimes median: $m, lower quartile: $l, upper quartile: $u")
 end
 
-# results:
-#i: 1
-#picked idx: 666
-#elapsed (sec.): 98.89742918100092
-#i: 2
-#picked idx: 386
-#elapsed (sec.): 89.83002206901438
-#i: 3
-#picked idx: 46
-#elapsed (sec.): 91.25445953200688
-#i: 4
-#picked idx: 250
-#elapsed (sec.): 88.41515733400593
+println("first run..")
+do_experiment(4)
 
-# median elapsed: 90.54224080051063
+println("second run..")
+do_experiment(4)
