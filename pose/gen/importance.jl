@@ -6,18 +6,22 @@ include("proposal.jl")
 import FileIO
 using Images: ImageCore
 import Random
-
-Random.seed!(1)
+using JLD
 
 # load the TF neural net parameters from disk
 sess = get_session(net)
 saver = train.Saver()
 saver.restore(sess, "net.ckpt")
 
-# generate test image and ground truth (choice map)
-trace = simulate(generative_model, ())
-image = trace[:image]
-(ground_truth_latent_image, _, _) = get_retval(trace)
+Random.seed!(1)
+
+# generate ground truth image
+#trace = simulate(generative_model, ())
+#image = trace[:image]
+#(ground_truth_latent_image, _, _) = get_retval(trace)
+#save("image.jld", "image", image, "ground_truth_latent_image", ground_truth_latent_image)
+image = load("image.jld", "image")
+ground_truth_latent_image = load("image.jld", "ground_truth_latent_image")
 
 const n = 10
 
@@ -26,7 +30,7 @@ function custom_proposal_importance_resampling()
     constraints = choicemap((:image, image))
     (inferred_trace, _) = importance_resampling(
         generative_model, (), constraints,
-        proposal, (image,), 1)
+        proposal, (image,), 10)
     (latent_image, _, _) = get_retval(inferred_trace)
     latent_image
 end
@@ -37,7 +41,7 @@ custom_proposal_latent_images = [custom_proposal_importance_resampling() for _=1
 function generic_proposal_importance_resampling()
     constraints = choicemap((:image, image))
     (inferred_trace, _) = importance_resampling(
-        generative_model, (), constraints, 1)
+        generative_model, (), constraints, 10)
     (latent_image, _, _) = get_retval(inferred_trace)
     latent_image
 end

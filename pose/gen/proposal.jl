@@ -5,9 +5,9 @@ using Printf
 using FileIO
 import Random
 
-@pyimport tensorflow as tf
-@pyimport tensorflow.nn as nn
-@pyimport tensorflow.train as train
+tf = pyimport("tensorflow")
+nn = pyimport("tensorflow.nn")
+train = pyimport("tensorflow.train")
 
 function conv2d(x, W)
     nn.conv2d(x, W, (1, 1, 1, 1), "SAME")
@@ -38,8 +38,8 @@ end
 
 const arch = NetworkArchitecture(32, 32, 64, 1024)
 
-images = tf.placeholder(tf.float64) # N x width x height
-images_reshaped = tf.reshape(images, [-1, width, height, 1])
+images_flat = tf.placeholder(tf.float64) # N x (width * height)
+images_reshaped = tf.reshape(images_flat, [-1, width, height, 1])
 
 # convolution + max pooling
 W_conv1 = weight_variable([5, 5, 1, arch.num_conv1])
@@ -68,11 +68,11 @@ h_fc1 = nn.relu(tf.add(tf.matmul(h_pool3_flat, W_fc1), b_fc1))
 # output layer
 W_fc2 = weight_variable([arch.num_fc, num_output])
 b_fc2 = bias_variable([num_output])
-output = nn.softmax(tf.add(tf.matmul(h_fc1, W_fc2), b_fc2), axis=1) # N x num_output
+output = tf.add(tf.matmul(h_fc1, W_fc2), b_fc2) # N x num_output
 
 const sess = tf.Session()
 const params = [W_conv1, b_conv1, W_conv2, b_conv2, W_conv3, b_conv3, W_fc1, b_fc1, W_fc2, b_fc2]
-const net = TFFunction(params, [images], output, sess)
+const net = TFFunction(params, [images_flat], output, sess)
 const update = ParamUpdate(ADAM(1e-4, 0.9, 0.999, 1e-08), net)
 
 @gen function neural_proposal_predict_beta((grad)(outputs::Vector{Float64}))
@@ -113,26 +113,24 @@ end
 @gen function proposal(image::Matrix{Float64})
 
     # run inference network
-    #image_flat = reshape(image, 1, width * height)
-    images = reshape(image, (1, width, height))
-    outputs = @trace(net(images), :network)
+    nn_input = reshape(image, 1, width * height)
+    outputs = @trace(net(nn_input), :network)
 
     # make prediction given inference network outputs
     @trace(neural_proposal_predict_beta(outputs[1,:]), :pose)
 end
 
-@gen function proposal_batched(images_vec::Vector{Matrix{Float64}})
+@gen function proposal_batched(images::Vector{Matrix{Float64}})
 
-    # get images from input trace
-    batch_size = length(images_vec)
-    images = Array{Float64}(undef, (batch_size, width, height))
-    #images_flat = zeros(Float64, batch_size, width * height)
+    # prepare input to neural network
+    batch_size = length(images)
+    nn_input = zeros(Float64, batch_size, width * height)
     for i=1:batch_size
-        images[i,:,:] = images_vec[i]
+        nn_input[i,:] = images[i][:]
     end
 
     # run inference network in batch
-    outputs = @trace(net(images), :network)
+    outputs = @trace(net(nn_input), :network)
 
     # make prediction for each image given inference network outputs
     for i=1:batch_size

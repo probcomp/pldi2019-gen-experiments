@@ -39,6 +39,7 @@ function train_inference_network(num_epoch::Int, epoch_size::Int,
             constraints = choicemap()
             set_submap!(constraints, :poses, vectorize_internal([get_submap(cm, :pose) for cm in minibatch_examples]))
             (trace, weight) = generate(proposal_batched, (images,), constraints)
+            println(weight)
             
             # increments gradient accumulators for batched proposal
             accumulate_param_gradients!(trace, nothing)
@@ -55,4 +56,5 @@ function train_inference_network(num_epoch::Int, epoch_size::Int,
 end
 
 # train it
-train_inference_network(100000, 1000, 300, 100)
+train_inference_network(100000, 100, 30, 10)
+#train_inference_network(100000, 100, 300, 100)

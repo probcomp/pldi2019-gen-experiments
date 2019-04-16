@@ -1,6 +1,6 @@
 using PyCall
 
-@pyimport rpyc
+rpyc = pyimport("rpyc")
 
 const RIG = "rig"
 const ARM_ELBOW_R = "arm elbow_R"
@@ -25,7 +25,7 @@ function BlenderClient(blender_path::String, model_path::String, port::Int)
     #sleep(5) # TODO be smarter (read stdout from the process)
     host = "localhost"
     conn = rpyc.connect(host, port)
-    root = conn[:root]
+    root = conn.root
     #BlenderClient(proc, conn, root)
     BlenderClient(conn, root)
 end
@@ -36,70 +36,70 @@ end
 #end
 
 function setup_for_depth!(client::BlenderClient)
-    client.root[:setup_for_depth]()
+    client.root.setup_for_depth()
     nothing
 end
 
 function setup_for_wireframe!(client::BlenderClient)
-    client.root[:setup_for_wireframe]()
+    client.root.setup_for_wireframe()
     nothing
 end
 
 function set_resolution!(client::BlenderClient, x, y)
-    client.root[:set_resolution](x, y)
+    client.root.set_resolution(x, y)
 end
 
 function add_plane!(client::BlenderClient, object::String, loc::Point3, rot::Point3, scale::Point3)
-    client.root[:add_plane](object, tup(loc), tup(rot), tup(scale))
+    client.root.add_plane(object, tup(loc), tup(rot), tup(scale))
 end
 
 function set_object_location!(client::BlenderClient, object::String, point::Point3)
-    client.root[:set_object_location](object, tup(point))
+    client.root.set_object_location(object, tup(point))
     nothing
 end
 
 function set_object_rotation_euler!(client::BlenderClient, object::String, point::Point3)
-    client.root[:set_object_rotation_euler](object, tup(point))
+    client.root.set_object_rotation_euler(object, tup(point))
     nothing
 end
 
 function set_object_scale!(client::BlenderClient, object::String, point::Point3)
-    client.root[:set_object_scale](object, tup(point))
+    client.root.set_object_scale(object, tup(point))
     nothing
 end
 
 function get_object_location!(client::BlenderClient, object::String)
-    Point3(client.root[:get_object_location](object))
+    Point3(client.root.get_object_location(object))
 end
 
 function get_object_rotation_euler(client::BlenderClient, object::String)
-    Point3(client.root[:get_object_rotation_euler](object))
+    Point3(client.root.get_object_rotation_euler(object))
 end
 
 function get_object_scale(client::BlenderClient, object::String)
-    Point3(client.root[:get_object_scale](object))
+    Point3(client.root.get_object_scale(object))
 end
 
 function set_bone_location(client::BlenderClient, object::String, bone::String, location::Point3)
-    client.root[:set_bone_location](object, bone, tup(location))
+    client.root.set_bone_location(object, bone, tup(location))
     nothing
 end
 
 function set_bone_rotation_euler!(client::BlenderClient, object::String, bone::String, rotation_euler::Point3)
-    client.root[:set_bone_rotation_euler](object, bone, tup(rotation_euler))
+    client.root.set_bone_rotation_euler(object, bone, tup(rotation_euler))
     nothing
 end
 
 function get_bone_location(client::BlenderClient, object::String, bone::String)
-    Point3(client.root[:get_bone_location](object, bone))
+    Point3(client.root.get_bone_location(object, bone))
 end
 
 function get_bone_rotation_euler(client::BlenderClient, object::String, bone::String)
-    Point3(client.root[:get_bone_rotation_euler](object, bone))
+    Point3(client.root.get_bone_rotation_euler(object, bone))
 end
 
 function render(client::BlenderClient, filepath)
-    client.root[:render](filepath)
+    client.root.render(filepath)
 end
 
 function get_body_pose(client::BlenderClient)
@@ -124,5 +124,5 @@ function set_body_pose!(client::BlenderClient, pose::BodyPose)
         "hip_loc" => tup(pose.hip_loc),
         "heel_r_loc" => tup(pose.heel_r_loc),
         "heel_l_loc" => tup(pose.heel_l_loc))
-    client.root[:set_body_pose](pose_dict)
+    client.root.set_body_pose(pose_dict)
 end
