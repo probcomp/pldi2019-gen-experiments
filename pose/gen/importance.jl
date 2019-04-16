@@ -43,7 +43,7 @@ function simulate_test_image()
         "ground_truth_latent_image", ground_truth_latent_image,
         "ground_truth_wireframe", ground_truth_wireframe)
 end
-#simulate_test_image()
+simulate_test_image()
 
 function read_test_image()
     pose_dict = JSON.parsefile("ground_truth_pose.json")
@@ -80,8 +80,9 @@ end
 generic_proposal_wireframes = [generic_proposal_importance_resampling() for _=1:n]
 
 # show the observed image and the reconstruction
-top_row = hcat(ground_truth_wireframe, ground_truth_latent_image, image, [zero(image) for i=1:(n-3)]...)
-middle_row = hcat(generic_proposal_wireframes...)
+FileIO.save("image.png", map(ImageCore.clamp01, image))
+FileIO.save("ground_truth.png", map(ImageCore.clamp01, ground_truth_wireframe))
+top_row = hcat(generic_proposal_wireframes...)
 bottom_row = hcat(custom_proposal_wireframes...)
-combined = vcat(top_row, middle_row, bottom_row)
+combined = vcat(top_row, bottom_row)
 FileIO.save("importance.png", map(ImageCore.clamp01, combined))
