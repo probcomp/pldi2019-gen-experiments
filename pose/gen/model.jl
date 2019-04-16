@@ -154,7 +154,7 @@ end
 const blender = "blender"
 const blender_model = "HumanKTH.decimated.blend"
 const renderer = BodyPoseDepthRenderer(width, height, blender, blender_model, 62000)
-const wireframe_renderer = BodyPoseWireframeRenderer(width, height, blender, blender_model, 62001)
+const wireframe_renderer = BodyPoseWireframeRenderer(400, 400, blender, blender_model, 62001)
 
 function render_depth_image(pose)
     render(renderer, pose)
