@@ -2,7 +2,7 @@ using Gen
 
 # depends on: pose.jl, renderer.jl
 
-function BodyPose(choices::ChoiceMap)
+function BodyPose(choices)
     rot_z = choices[:rot_z]
     rotation = scale_rot(rot_z)
     elbow_r_loc_x = choices[:elbow_r_loc_x]
@@ -153,8 +153,8 @@ end
 
 const blender = "blender"
 const blender_model = "HumanKTH.decimated.blend"
-const port = 62000
-const renderer = BodyPoseDepthRenderer(width, height, blender, blender_model, port)
+const renderer = BodyPoseDepthRenderer(width, height, blender, blender_model, 62000)
+const wireframe_renderer = BodyPoseWireframeRenderer(width, height, blender, blender_model, 62001)
 
 function render_depth_image(pose)
     render(renderer, pose)
