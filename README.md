@@ -11,7 +11,7 @@ This repository contains the code for figures and experiments appearing in
 ## Structure of the repository
 
 - [example](./example) contains the code for the tutorial in Figure 2.
-- [regression](./regression) contains the code for the robust Bayesian regression baseline in Section 7.1.
+- [regression](./regression) contains the code for the robust Bayesian regression benchmark in Section 7.1.
 - [gp](./gp) contains the code for the Gaussian process structure benchmark in Section 7.2.
 - [algorithmic-model](./algorithmic-model) contains the code for the algorithmic model of an autonomous agent in Section 7.3.
 - [state-space](./state-space) contains the code for the nonlinear state-space model in Section 7.4.
