@@ -8,6 +8,7 @@ using Images: ImageCore
 import Random
 using JLD
 import JSON
+using Statistics: median, mean, std, quantile
 
 # load the TF neural net parameters from disk
 sess = get_session(net)
@@ -43,7 +44,7 @@ function simulate_test_image()
         "ground_truth_latent_image", ground_truth_latent_image,
         "ground_truth_wireframe", ground_truth_wireframe)
 end
-simulate_test_image()
+#simulate_test_image()
 
 function read_test_image()
     pose_dict = JSON.parsefile("ground_truth_pose.json")
@@ -54,35 +55,87 @@ function read_test_image()
 end
 (ground_truth_pose_dict, ground_truth_latent_image, ground_truth_wireframe, image) = read_test_image()
 
-const n = 10
-
 # run sampling importance resampling with the trained proposal
 function custom_proposal_importance_resampling()
     constraints = choicemap((:image, image))
-    (inferred_trace, _) = importance_resampling(
+    (trace, _) = importance_resampling(
         generative_model, (), constraints,
         proposal, (image,), 10)
-    pose = BodyPose(get_submap(get_choices(inferred_trace), :pose))
-    render(wireframe_renderer, pose)
+    trace
 end
-
-custom_proposal_wireframes = [custom_proposal_importance_resampling() for _=1:n]
 
 # run sampling importance resampling with the prior proposal
 function generic_proposal_importance_resampling()
     constraints = choicemap((:image, image))
-    (inferred_trace, _) = importance_resampling(
-        generative_model, (), constraints, 10)
-    pose = BodyPose(get_submap(get_choices(inferred_trace), :pose))
-    render(wireframe_renderer, pose)
+    (trace, _) = importance_resampling(
+        generative_model, (), constraints, 100)
+    trace
 end
 
-generic_proposal_wireframes = [generic_proposal_importance_resampling() for _=1:n]
+function do_experiment(n::Int)
 
-# show the observed image and the reconstruction
-FileIO.save("image.png", map(ImageCore.clamp01, image))
-FileIO.save("ground_truth.png", map(ImageCore.clamp01, ground_truth_wireframe))
-top_row = hcat(generic_proposal_wireframes...)
-bottom_row = hcat(custom_proposal_wireframes...)
-combined = vcat(top_row, bottom_row)
-FileIO.save("importance.png", map(ImageCore.clamp01, combined))
+    # do custom proposal experiment
+    custom_proposal_runtimes = []
+    custom_proposal_wireframes = []
+    custom_proposal_poses = []
+    for i=1:n
+        start = time_ns()
+        trace = custom_proposal_importance_resampling()
+        elapsed = (time_ns() - start) / 1e9
+        pose = BodyPose(get_submap(get_choices(trace), :pose))
+        push!(custom_proposal_poses, pose)
+        wireframe = render(wireframe_renderer, pose)
+        push!(custom_proposal_runtimes, elapsed)
+        push!(custom_proposal_wireframes, wireframe)
+    end
+
+    # do generic proposal experiment
+    generic_proposal_runtimes = []
+    generic_proposal_wireframes = []
+    generic_proposal_poses = []
+    for i=1:n
+        start = time_ns()
+        trace = generic_proposal_importance_resampling()
+        elapsed = (time_ns() - start) / 1e9
+        pose = BodyPose(get_submap(get_choices(trace), :pose))
+        push!(generic_proposal_poses, pose)
+        wireframe = render(wireframe_renderer, pose)
+        push!(generic_proposal_runtimes, elapsed)
+        push!(generic_proposal_wireframes, wireframe)
+    end
+
+    # save results
+    results = Dict(:generic => Dict(:times => generic_proposal_runtimes,
+                                    :poses => generic_proposal_poses),
+                   :custom => Dict(:times => custom_proposal_runtimes,
+                                   :poses => custom_proposal_poses))
+    open("results.json", "w") do f
+        write(f, JSON.json(results))
+    end
+
+    # print timing results summary
+    l = quantile(custom_proposal_runtimes, 0.25)
+    m = median(custom_proposal_runtimes)
+    u = quantile(custom_proposal_runtimes, 0.75)
+    println("custom proposal: median: $m, lower quartile: $l, upper quartile: $u")
+    l = quantile(generic_proposal_runtimes, 0.25)
+    m = median(generic_proposal_runtimes)
+    u = quantile(generic_proposal_runtimes, 0.75)
+    println("generic proposal: median: $m, lower quartile: $l, upper quartile: $u")
+
+    # save the observed image and inferred wireframes
+    FileIO.save("image.png", map(ImageCore.clamp01, image))
+    FileIO.save("ground_truth.png", map(ImageCore.clamp01, ground_truth_wireframe))
+    top_row = hcat(generic_proposal_wireframes...)
+    bottom_row = hcat(custom_proposal_wireframes...)
+    combined = vcat(top_row, bottom_row)
+    FileIO.save("inferences.png", map(ImageCore.clamp01, combined))
+end
+
+# first run, to trigger precompilation
+println("first run..")
+do_experiment(10)
+
+# second run
+println("second run..")
+do_experiment(10)
