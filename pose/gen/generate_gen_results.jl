@@ -15,9 +15,6 @@ sess = get_session(net)
 saver = train.Saver()
 saver.restore(sess, "net.ckpt")
 
-Random.seed!(1)
-
-# generate ground truth image
 const pose_addrs = [
     :rot_z,
     :elbow_r_loc_x, :elbow_r_loc_y, :elbow_r_loc_z,
@@ -27,6 +24,9 @@ const pose_addrs = [
     :heel_r_loc_x, :heel_r_loc_y, :heel_r_loc_z,
     :heel_l_loc_x, :heel_l_loc_y, :heel_l_loc_z]
 
+Random.seed!(1)
+
+# generate ground truth image
 function simulate_test_image()
     trace = simulate(generative_model, ())
     image = trace[:image]
@@ -43,8 +43,13 @@ function simulate_test_image()
         "image", image,
         "ground_truth_latent_image", ground_truth_latent_image,
         "ground_truth_wireframe", ground_truth_wireframe)
+    FileIO.save("image.png", map(ImageCore.clamp01, image))
+    FileIO.save("ground_truth.png", map(ImageCore.clamp01, ground_truth_wireframe))
 end
-#simulate_test_image()
+simulate_test_image()
+
+# do inference experiment
+Random.seed!(2)
 
 function read_test_image()
     pose_dict = JSON.parsefile("ground_truth_pose.json")
@@ -68,7 +73,7 @@ end
 function generic_proposal_importance_resampling()
     constraints = choicemap((:image, image))
     (trace, _) = importance_resampling(
-        generative_model, (), constraints, 100)
+        generative_model, (), constraints, 12)
     trace
 end
 
@@ -123,19 +128,17 @@ function do_experiment(n::Int)
     u = quantile(generic_proposal_runtimes, 0.75)
     println("generic proposal: median: $m, lower quartile: $l, upper quartile: $u")
 
-    # save the observed image and inferred wireframes
-    FileIO.save("image.png", map(ImageCore.clamp01, image))
-    FileIO.save("ground_truth.png", map(ImageCore.clamp01, ground_truth_wireframe))
-    top_row = hcat(generic_proposal_wireframes...)
-    bottom_row = hcat(custom_proposal_wireframes...)
-    combined = vcat(top_row, bottom_row)
-    FileIO.save("inferences.png", map(ImageCore.clamp01, combined))
+    # save the inferred wireframes
+    for i=1:n
+        FileIO.save("generic-proposal-wireframe-$i.png", map(ImageCore.clamp01, generic_proposal_wireframes[i]))
+        FileIO.save("custom-proposal-wireframe-$i.png", map(ImageCore.clamp01, custom_proposal_wireframes[i]))
+    end
 end
 
 # first run, to trigger precompilation
 println("first run..")
-do_experiment(10)
+do_experiment(4)
 
 # second run
 println("second run..")
-do_experiment(10)
+do_experiment(4)
