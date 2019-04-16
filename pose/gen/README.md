@@ -4,7 +4,11 @@
 
 Build PyCall with the `PYTHON` environment variable set to the absolute path of the Python executable in a virtualenv with TensorFlow==1.12 and rpyc installed, e.g.:
 ```
-PYTHON=/home/my_tf_env/bin/python JULIA_PROJECT=. -e 'using Pkg; Pkg.build("PyCall")'
+virtualenv -p python3 $HOME/my_env
+source $HOME/my_env/bin/activate
+pip install rpyc tensorflow==1.12
+deactivate
+PYTHON=$HOME/my_env/bin/python JULIA_PROJECT=. -e 'using Pkg; Pkg.build("PyCall")'
 ```
 
 ## Run
